@@ -1,0 +1,39 @@
+# ==============================================================================
+# ABInBev Case - Terraform Variables Example
+# ==============================================================================
+#
+# Copie este arquivo para terraform.tfvars e ajuste os valores
+# NUNCA commite terraform.tfvars no git (contem senhas)
+#
+# ==============================================================================
+
+# General
+project_name = "abinbev-case"
+environment  = "dev"
+location     = "East US 2"
+
+# Storage
+storage_account_name     = "abinbevdatalake"
+storage_replication_type = "LRS"
+
+# HDInsight
+hdinsight_cluster_name          = "abinbev-spark-cluster"
+hdinsight_cluster_version       = "5.1"
+hdinsight_spark_version         = "3.3"
+hdinsight_head_node_vm_size     = "Standard_D4_v2"
+hdinsight_worker_node_vm_size   = "Standard_D4_v2"
+hdinsight_worker_node_count_min = 2
+hdinsight_worker_node_count_max = 10
+hdinsight_username              = "sparkadmin"
+hdinsight_password              = "CHANGE_ME_Strong@Pass123"
+hdinsight_ssh_username          = "sshuser"
+hdinsight_ssh_password          = "CHANGE_ME_Strong@Pass123"
+
+# Data Factory
+data_factory_name      = "abinbev-adf"
+pipeline_schedule_time = "02:00"
+
+# Observability
+observability_enabled  = true
+grafana_admin_password = "Admin@123456"
+

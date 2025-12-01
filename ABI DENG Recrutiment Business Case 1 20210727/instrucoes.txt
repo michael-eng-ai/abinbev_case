@@ -1,0 +1,9 @@
+Bom dia, Michael,  Tudo bem?   
+Gostamos muito da nossa conversa e gostaríamos que você fizesse o case em anexo. 
+Peço que analise o case e nos passe uma data para devolução, sendo em até 4 dias, e na sequência vamos marcar uma apresentação com o time técnico para você apresentar o raciocínio do desenvolvimento.
+
+O business case anexo tem instruções e amostras de dados para a criação de uma solução de analytics; gostaríamos de ver ao máximo seu conhecimento com soluções de data lake/big data com processamento paralelizado MPP (Spark). Portanto quanto mais você puder utilizar arquiteturas cloud , pyspark e modelagem de dados dimensionalizada , maior será o benefício para sua avaliação. 
+
+Preferencialmente seria indicado utilizar a plataforma Azure em arquitetura Medallion.
+
+Caso tenha alguma dúvida no material ou durante a realização do exercício pode retornar neste e-mail.

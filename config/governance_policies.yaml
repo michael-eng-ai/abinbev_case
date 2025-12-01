@@ -1,0 +1,274 @@
+# ==============================================================================
+# ABInBev Case - Governance Policies
+# ==============================================================================
+#
+# Este arquivo define as politicas de governanca de dados.
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Politicas de Acesso por Camada
+# ------------------------------------------------------------------------------
+
+access_policies:
+  landing:
+    description: "Arquivos brutos - Acesso restrito a engenharia de dados"
+    read:
+      - role: data_engineer
+      - role: admin
+    write:
+      - role: data_engineer
+      - role: admin
+    
+  bronze:
+    description: "Dados brutos em Delta - Acesso restrito a engenharia"
+    read:
+      - role: data_engineer
+      - role: data_scientist
+      - role: admin
+    write:
+      - role: data_engineer
+      - role: admin
+    
+  silver:
+    description: "Dados limpos - Acesso para cientistas e analistas"
+    read:
+      - role: data_engineer
+      - role: data_scientist
+      - role: data_analyst
+      - role: admin
+    write:
+      - role: data_engineer
+      - role: admin
+    
+  gold:
+    description: "Dados com regras de negocio - Acesso para analistas"
+    read:
+      - role: data_engineer
+      - role: data_scientist
+      - role: data_analyst
+      - role: business_user
+      - role: admin
+    write:
+      - role: data_engineer
+      - role: admin
+    
+  consumption:
+    description: "Modelo dimensional - Acesso para BI e usuarios de negocio"
+    read:
+      - role: data_engineer
+      - role: data_scientist
+      - role: data_analyst
+      - role: business_user
+      - role: bi_developer
+      - role: admin
+    write:
+      - role: data_engineer
+      - role: admin
+
+# ------------------------------------------------------------------------------
+# Politicas de Retencao de Dados
+# ------------------------------------------------------------------------------
+
+retention_policies:
+  landing:
+    retention_days: 90
+    archive_after_days: 30
+    description: "Arquivos brutos mantidos por 90 dias"
+    
+  bronze:
+    retention_days: 365
+    archive_after_days: 180
+    description: "Dados historicos mantidos por 1 ano"
+    
+  silver:
+    retention_days: 730
+    archive_after_days: 365
+    description: "Dados limpos mantidos por 2 anos"
+    
+  gold:
+    retention_days: 1095
+    archive_after_days: 730
+    description: "Dados de negocio mantidos por 3 anos"
+    
+  consumption:
+    retention_days: 1095
+    archive_after_days: 730
+    description: "Modelo dimensional mantido por 3 anos"
+    
+  control:
+    retention_days: 365
+    archive_after_days: 180
+    description: "Logs de controle mantidos por 1 ano"
+
+# ------------------------------------------------------------------------------
+# Classificacao de Dados
+# ------------------------------------------------------------------------------
+
+data_classification:
+  levels:
+    - name: PUBLIC
+      description: "Dados publicos, sem restricao"
+      examples:
+        - "Agregacoes publicas"
+        - "Estatisticas gerais"
+      
+    - name: INTERNAL
+      description: "Dados internos, acesso restrito a funcionarios"
+      examples:
+        - "Vendas por regiao"
+        - "Performance de marcas"
+      
+    - name: CONFIDENTIAL
+      description: "Dados confidenciais, acesso restrito"
+      examples:
+        - "Margens de lucro"
+        - "Estrategias de preco"
+      
+    - name: RESTRICTED
+      description: "Dados altamente restritos, acesso controlado"
+      examples:
+        - "Dados de clientes"
+        - "Informacoes financeiras detalhadas"
+
+  table_classifications:
+    bronze_beverage_sales: INTERNAL
+    bronze_channel_features: INTERNAL
+    silver_sales_enriched: INTERNAL
+    silver_channel_features: INTERNAL
+    gold_sales_enriched: INTERNAL
+    gold_channels_enriched: INTERNAL
+    fact_sales: INTERNAL
+    dim_date: PUBLIC
+    dim_region: PUBLIC
+    dim_product: INTERNAL
+    dim_channel: INTERNAL
+    agg_sales_region_tradegroup: INTERNAL
+    agg_sales_brand_month: INTERNAL
+    agg_sales_brand_region: INTERNAL
+    process_control: CONFIDENTIAL
+    quarantine: CONFIDENTIAL
+
+# ------------------------------------------------------------------------------
+# Politicas de Qualidade de Dados
+# ------------------------------------------------------------------------------
+
+data_quality_policies:
+  thresholds:
+    completeness:
+      min: 0.95
+      description: "Minimo 95% de campos nao nulos para campos obrigatorios"
+      
+    uniqueness:
+      min: 1.0
+      description: "100% de unicidade para chaves primarias"
+      
+    validity:
+      min: 0.98
+      description: "Minimo 98% de valores validos"
+      
+    freshness:
+      max_hours: 24
+      description: "Dados devem ser atualizados em ate 24 horas"
+
+  alerting:
+    on_threshold_breach:
+      notify:
+        - channel: slack
+          webhook: "${SLACK_WEBHOOK_URL}"
+        - channel: email
+          recipients:
+            - data-team@company.com
+      severity: WARNING
+      
+    on_pipeline_failure:
+      notify:
+        - channel: slack
+          webhook: "${SLACK_WEBHOOK_URL}"
+        - channel: pagerduty
+          service_key: "${PAGERDUTY_KEY}"
+      severity: CRITICAL
+
+# ------------------------------------------------------------------------------
+# Glossario de Termos de Negocio
+# ------------------------------------------------------------------------------
+
+business_glossary:
+  terms:
+    - term: Dollar Volume
+      definition: "Valor monetario das vendas em dolares americanos"
+      synonyms:
+        - Sales Volume
+        - Revenue
+      related_columns:
+        - dollar_volume
+        - total_dollar_volume
+        
+    - term: Trade Group
+      definition: "Agrupamento de canais de venda por tipo de estabelecimento"
+      synonyms:
+        - Channel Group
+        - Trade Channel Group
+      values:
+        - GROCERY: "Supermercados e hipermercados"
+        - ENTERTAINMENT: "Restaurantes e venues"
+        - SERVICES: "Lojas de conveniencia"
+        - ACADEMIC: "Escolas e universidades"
+        - GOV & MILITARY: "Governo e instalacoes militares"
+        - OTHER: "Outros canais"
+        
+    - term: Region
+      definition: "Divisao geografica de vendas"
+      synonyms:
+        - Territory
+        - Area
+      values:
+        - NORTHEAST: "Regiao nordeste dos EUA"
+        - SOUTHEAST: "Regiao sudeste dos EUA"
+        - MIDWEST: "Regiao centro-oeste dos EUA"
+        - SOUTHWEST: "Regiao sudoeste dos EUA"
+        - WEST: "Regiao oeste dos EUA"
+        - GREAT LAKES: "Regiao dos Grandes Lagos"
+        - CANADA: "Canada"
+        
+    - term: Brand
+      definition: "Marca do produto"
+      synonyms:
+        - Product Brand
+      related_columns:
+        - brand_nm
+        
+    - term: Negative Sale
+      definition: "Venda com valor negativo, indica devolucao ou estorno"
+      synonyms:
+        - Return
+        - Refund
+      related_columns:
+        - is_negative_sale
+
+# ------------------------------------------------------------------------------
+# Owners e Stewards
+# ------------------------------------------------------------------------------
+
+data_ownership:
+  default_owner: "Data Engineering Team"
+  
+  stewards:
+    bronze:
+      team: "Data Engineering"
+      contact: "data-engineering@company.com"
+      
+    silver:
+      team: "Data Engineering"
+      contact: "data-engineering@company.com"
+      
+    gold:
+      team: "Data Engineering"
+      contact: "data-engineering@company.com"
+      business_owner: "Analytics Team"
+      
+    consumption:
+      team: "Data Engineering"
+      contact: "data-engineering@company.com"
+      business_owner: "BI Team"
+

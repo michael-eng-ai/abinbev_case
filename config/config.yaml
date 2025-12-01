@@ -1,0 +1,182 @@
+# =============================================================================
+# ABInBev Case - Configuration File
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Environment Settings
+# -----------------------------------------------------------------------------
+environment: "development"  # development, staging, production
+
+# -----------------------------------------------------------------------------
+# Storage Paths
+# -----------------------------------------------------------------------------
+storage:
+  # Base path (ajustar conforme ambiente)
+  base_path: "./data"  # Local
+  # base_path: "abfss://container@storageaccount.dfs.core.windows.net"  # Azure
+  
+  # Layer paths
+  paths:
+    landing: "${storage.base_path}/landing"
+    bronze: "${storage.base_path}/bronze"
+    silver: "${storage.base_path}/silver"
+    quarantine: "${storage.base_path}/quarantine"
+    gold: "${storage.base_path}/gold"
+    aggregation: "${storage.base_path}/aggregation"
+    control: "${storage.base_path}/control"
+
+# -----------------------------------------------------------------------------
+# Source Files
+# -----------------------------------------------------------------------------
+sources:
+  beverage_sales:
+    filename: "abi_bus_case1_beverage_sales_20210726.csv"
+    format: "csv"
+    delimiter: "\t"  # TAB-separated
+    header: true
+    encoding: "UTF-16"  # UTF-16 Little-Endian!
+    
+  channel_features:
+    filename: "abi_bus_case1_beverage_channel_group_20210726.csv"
+    format: "csv"
+    delimiter: ","
+    header: true
+    encoding: "UTF-8"
+
+# -----------------------------------------------------------------------------
+# Table Definitions
+# -----------------------------------------------------------------------------
+tables:
+  # Bronze Layer
+  bronze:
+    beverage_sales:
+      name: "bronze_beverage_sales"
+      partition_by: ["ingestion_date"]
+      
+    channel_features:
+      name: "bronze_channel_features"
+      partition_by: ["ingestion_date"]
+  
+  # Silver Layer
+  silver:
+    beverage_sales:
+      name: "silver_beverage_sales"
+      partition_by: ["year", "month"]
+      
+    channel_features:
+      name: "silver_channel_features"
+      partition_by: []
+      
+    sales_enriched:
+      name: "silver_sales_enriched"
+      partition_by: ["year", "month"]
+      
+  # Quarantine
+  quarantine:
+    beverage_sales:
+      name: "quarantine_beverage_sales"
+      partition_by: ["quarantine_date"]
+  
+  # Gold Layer - Dimensions
+  gold:
+    dimensions:
+      dim_date:
+        name: "dim_date"
+        primary_key: "date_key"
+        
+      dim_region:
+        name: "dim_region"
+        primary_key: "region_key"
+        
+      dim_product:
+        name: "dim_product"
+        primary_key: "product_key"
+        
+      dim_channel:
+        name: "dim_channel"
+        primary_key: "channel_key"
+    
+    # Gold Layer - Facts
+    facts:
+      fact_sales:
+        name: "fact_sales"
+        partition_by: ["year", "month"]
+        
+  # Aggregation Layer
+  aggregation:
+    agg_sales_region_tradegroup:
+      name: "agg_sales_region_tradegroup"
+      description: "Top Trade Groups by Region"
+      refresh: "full"
+      
+    agg_sales_brand_month:
+      name: "agg_sales_brand_month"
+      description: "Sales by Brand and Month"
+      refresh: "full"
+      
+    agg_sales_brand_region:
+      name: "agg_sales_brand_region"
+      description: "Sales by Brand and Region"
+      refresh: "full"
+
+  # Control Tables
+  control:
+    process_control:
+      name: "process_control"
+      
+    data_quality_log:
+      name: "data_quality_log"
+      
+    pipeline_metrics:
+      name: "pipeline_metrics"
+
+# -----------------------------------------------------------------------------
+# Data Quality Thresholds
+# -----------------------------------------------------------------------------
+data_quality:
+  thresholds:
+    completeness: 0.95
+    uniqueness: 1.0
+    validity: 0.98
+    
+  critical_columns:
+    beverage_sales:
+      - "BRAND_NM"
+      - "TRADE_CHNL_DESC"  # Chave de join com channel_features
+      - "$ Volume"
+      
+    channel_features:
+      - "TRADE_CHNL_DESC"  # Primary key
+      - "TRADE_GROUP_DESC"
+
+# -----------------------------------------------------------------------------
+# Spark Configuration
+# -----------------------------------------------------------------------------
+spark:
+  app_name: "ABInBev_Beverage_Analytics"
+  
+  config:
+    spark.sql.extensions: "io.delta.sql.DeltaSparkSessionExtension"
+    spark.sql.catalog.spark_catalog: "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+    spark.sql.adaptive.enabled: "true"
+    spark.sql.adaptive.coalescePartitions.enabled: "true"
+    spark.sql.shuffle.partitions: "200"
+    spark.databricks.delta.optimizeWrite.enabled: "true"
+    spark.databricks.delta.autoCompact.enabled: "true"
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {module}:{function}:{line} | {message}"
+  
+  handlers:
+    console:
+      enabled: true
+      
+    file:
+      enabled: true
+      path: "logs/pipeline.log"
+      rotation: "10 MB"
+      retention: "30 days"
