@@ -7,24 +7,7 @@ Funcoes para enriquecimento de negocio e regras de negocio na camada Gold.
 from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import (
-    avg,
-    col,
-    count,
-    current_timestamp,
-    lit,
-)
-from pyspark.sql.functions import max as spark_max
-from pyspark.sql.functions import min as spark_min
-from pyspark.sql.functions import (
-    month,
-    quarter,
-)
-from pyspark.sql.functions import sum as spark_sum
-from pyspark.sql.functions import (
-    when,
-    year,
-)
+from pyspark.sql import functions as F
 
 
 def add_business_metrics(
@@ -45,11 +28,11 @@ def add_business_metrics(
     """
     # Calcula metricas por grupo
     metrics_df = df.groupBy(*group_columns).agg(
-        spark_sum(value_column).alias(f"{value_column}_total"),
-        avg(value_column).alias(f"{value_column}_avg"),
-        spark_max(value_column).alias(f"{value_column}_max"),
-        spark_min(value_column).alias(f"{value_column}_min"),
-        count("*").alias("record_count"),
+        F.sum(value_column).alias(f"{value_column}_total"),
+        F.avg(value_column).alias(f"{value_column}_avg"),
+        F.max(value_column).alias(f"{value_column}_max"),
+        F.min(value_column).alias(f"{value_column}_min"),
+        F.count("*").alias("record_count"),
     )
 
     # Join com dados originais
@@ -104,21 +87,21 @@ def apply_business_rules(
                 high = range_values[1]
 
                 if low is not None and high is not None:
-                    condition_expr = (col(source_column) >= low) & (col(source_column) < high)
+                    condition_expr = (F.col(source_column) >= low) & (F.col(source_column) < high)
                 elif low is not None:
-                    condition_expr = col(source_column) >= low
+                    condition_expr = F.col(source_column) >= low
                 elif high is not None:
-                    condition_expr = col(source_column) < high
+                    condition_expr = F.col(source_column) < high
                 else:
                     continue
 
                 if category_expr is None:
-                    category_expr = when(condition_expr, lit(category_value))
+                    category_expr = F.when(condition_expr, F.lit(category_value))
                 else:
-                    category_expr = category_expr.when(condition_expr, lit(category_value))
+                    category_expr = category_expr.when(condition_expr, F.lit(category_value))
 
             if category_expr is not None:
-                result = result.withColumn(new_column, category_expr.otherwise(lit("Unknown")))
+                result = result.withColumn(new_column, category_expr.otherwise(F.lit("Unknown")))
 
         elif rule_type == "calculation":
             # Calculos pre-definidos - evita uso de eval por seguranca
@@ -126,13 +109,21 @@ def apply_business_rules(
             source_cols = rule_config.get("source_columns", [])
 
             if calc_type == "sum" and len(source_cols) >= 2:
-                result = result.withColumn(new_column, col(source_cols[0]) + col(source_cols[1]))
+                result = result.withColumn(
+                    new_column, F.col(source_cols[0]) + F.col(source_cols[1])
+                )
             elif calc_type == "multiply" and len(source_cols) >= 2:
-                result = result.withColumn(new_column, col(source_cols[0]) * col(source_cols[1]))
+                result = result.withColumn(
+                    new_column, F.col(source_cols[0]) * F.col(source_cols[1])
+                )
             elif calc_type == "divide" and len(source_cols) >= 2:
-                result = result.withColumn(new_column, col(source_cols[0]) / col(source_cols[1]))
+                result = result.withColumn(
+                    new_column, F.col(source_cols[0]) / F.col(source_cols[1])
+                )
             elif calc_type == "subtract" and len(source_cols) >= 2:
-                result = result.withColumn(new_column, col(source_cols[0]) - col(source_cols[1]))
+                result = result.withColumn(
+                    new_column, F.col(source_cols[0]) - F.col(source_cols[1])
+                )
             # Adicione mais operacoes conforme necessario
 
         elif rule_type == "derived":
@@ -140,11 +131,10 @@ def apply_business_rules(
             operation = rule_config.get("operation", "concat")
 
             if operation == "concat":
-                from pyspark.sql.functions import concat_ws
-
                 separator = rule_config.get("separator", "_")
                 result = result.withColumn(
-                    new_column, concat_ws(separator, *[col(c) for c in source_columns])
+                    new_column,
+                    F.concat_ws(separator, *[F.col(c) for c in source_columns]),
                 )
 
     return result
@@ -169,9 +159,9 @@ def add_time_dimensions(
     p = f"{prefix}_" if prefix else ""
 
     return (
-        df.withColumn(f"{p}year", year(col(date_column)))
-        .withColumn(f"{p}month", month(col(date_column)))
-        .withColumn(f"{p}quarter", quarter(col(date_column)))
+        df.withColumn(f"{p}year", F.year(F.col(date_column)))
+        .withColumn(f"{p}month", F.month(F.col(date_column)))
+        .withColumn(f"{p}quarter", F.quarter(F.col(date_column)))
     )
 
 
@@ -198,11 +188,11 @@ def create_fact_table(
         aggregations = {col_name: "sum" for col_name in measure_columns}
 
     agg_funcs = {
-        "sum": spark_sum,
-        "avg": avg,
-        "count": count,
-        "max": spark_max,
-        "min": spark_min,
+        "sum": F.sum,
+        "avg": F.avg,
+        "count": F.count,
+        "max": F.max,
+        "min": F.min,
     }
 
     agg_expressions = []
@@ -231,19 +221,17 @@ def create_dimension_table(
     Returns:
         DataFrame da tabela dimensao
     """
-    from pyspark.sql.functions import monotonically_increasing_id
-
     # Seleciona colunas unicas
     dim_df = df.select([key_column] + attribute_columns).distinct()
 
     # Adiciona chave surrogada
-    dim_df = dim_df.withColumn(surrogate_key_name, monotonically_increasing_id() + 1)
+    dim_df = dim_df.withColumn(surrogate_key_name, F.monotonically_increasing_id() + 1)
 
     # Adiciona campos de auditoria
     dim_df = (
-        dim_df.withColumn("_valid_from", current_timestamp())
-        .withColumn("_valid_to", lit(None).cast("timestamp"))
-        .withColumn("_is_current", lit(True))
+        dim_df.withColumn("_valid_from", F.current_timestamp())
+        .withColumn("_valid_to", F.lit(None).cast("timestamp"))
+        .withColumn("_is_current", F.lit(True))
     )
 
     return dim_df

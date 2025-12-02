@@ -10,15 +10,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import (
-    col,
-    concat_ws,
-    current_timestamp,
-    lit,
-    md5,
-    sha2,
-    trim,
-)
+from pyspark.sql import functions as F
 
 
 def standardize_column_names(df: DataFrame) -> DataFrame:
@@ -70,13 +62,13 @@ def add_audit_columns(
     batch = batch_id or now.strftime("%Y%m%d%H%M%S")
 
     return (
-        df.withColumn("_source_file", lit(source_file))
-        .withColumn("_source_path", lit(source_path))
-        .withColumn("_ingestion_date", lit(now.strftime("%Y-%m-%d")))
-        .withColumn("_ingestion_timestamp", current_timestamp())
-        .withColumn("_batch_id", lit(batch))
-        .withColumn("_updated_at", current_timestamp())
-        .withColumn("_layer", lit(layer))
+        df.withColumn("_source_file", F.lit(source_file))
+        .withColumn("_source_path", F.lit(source_path))
+        .withColumn("_ingestion_date", F.lit(now.strftime("%Y-%m-%d")))
+        .withColumn("_ingestion_timestamp", F.current_timestamp())
+        .withColumn("_batch_id", F.lit(batch))
+        .withColumn("_updated_at", F.current_timestamp())
+        .withColumn("_layer", F.lit(layer))
     )
 
 
@@ -99,7 +91,7 @@ def add_primary_key(df: DataFrame, key_columns: List[str]) -> DataFrame:
 
     return df.withColumn(
         "_pk",
-        md5(concat_ws("||", *[trim(col(c).cast("string")) for c in key_columns])),
+        F.md5(F.concat_ws("||", *[F.trim(F.col(c).cast("string")) for c in key_columns])),
     )
 
 
@@ -137,7 +129,7 @@ def add_row_hash(
 
     return df.withColumn(
         "_row_hash",
-        sha2(concat_ws("||", *[trim(col(c).cast("string")) for c in hash_columns]), 256),
+        F.sha2(F.concat_ws("||", *[F.trim(F.col(c).cast("string")) for c in hash_columns]), 256),
     )
 
 
@@ -153,7 +145,7 @@ def update_layer_timestamp(df: DataFrame, layer: str) -> DataFrame:
         DataFrame com campos atualizados
     """
     return (
-        df.withColumn("_updated_at", current_timestamp())
-        .withColumn("_layer", lit(layer))
-        .withColumn(f"_{layer}_timestamp", current_timestamp())
+        df.withColumn("_updated_at", F.current_timestamp())
+        .withColumn("_layer", F.lit(layer))
+        .withColumn(f"_{layer}_timestamp", F.current_timestamp())
     )

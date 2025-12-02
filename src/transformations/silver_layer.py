@@ -7,22 +7,13 @@ Funcoes para limpeza, validacao e qualidade de dados na camada Silver.
 from typing import Dict, List, Optional, Tuple
 
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import (
-    col,
-    current_timestamp,
-    lit,
-    regexp_replace,
-    trim,
-    when,
-)
+from pyspark.sql import functions as F
 from pyspark.sql.types import (
     DateType,
     DoubleType,
     IntegerType,
     LongType,
     StringType,
-    StructField,
-    StructType,
     TimestampType,
 )
 
@@ -44,7 +35,7 @@ def clean_string_columns(df: DataFrame, columns: Optional[List[str]] = None) -> 
     result = df
     for column in columns:
         if column in df.columns:
-            result = result.withColumn(column, trim(col(column)))
+            result = result.withColumn(column, F.trim(F.col(column)))
 
     return result
 
@@ -78,7 +69,7 @@ def cast_columns(df: DataFrame, column_types: Dict[str, str]) -> DataFrame:
         if column in df.columns:
             target_type = type_mapping.get(dtype.lower())
             if target_type:
-                result = result.withColumn(column, col(column).cast(target_type))
+                result = result.withColumn(column, F.col(column).cast(target_type))
 
     return result
 
@@ -104,8 +95,8 @@ def apply_data_quality_rules(
         Tupla (DataFrame valido, DataFrame quarentena)
     """
     # Adiciona coluna de validacao
-    result = df.withColumn("_is_valid", lit(True))
-    result = result.withColumn("_validation_errors", lit(""))
+    result = df.withColumn("_is_valid", F.lit(True))
+    result = result.withColumn("_validation_errors", F.lit(""))
 
     for rule in rules:
         column = rule.get("column")
@@ -117,64 +108,64 @@ def apply_data_quality_rules(
         if rule_type == "not_null":
             result = result.withColumn(
                 "_is_valid",
-                when(col(column).isNull(), lit(False)).otherwise(col("_is_valid")),
+                F.when(F.col(column).isNull(), F.lit(False)).otherwise(F.col("_is_valid")),
             )
             result = result.withColumn(
                 "_validation_errors",
-                when(
-                    col(column).isNull(),
-                    concat_with_separator(col("_validation_errors"), f"{column}:null"),
-                ).otherwise(col("_validation_errors")),
+                F.when(
+                    F.col(column).isNull(),
+                    concat_with_separator(F.col("_validation_errors"), f"{column}:null"),
+                ).otherwise(F.col("_validation_errors")),
             )
 
         elif rule_type == "positive":
             result = result.withColumn(
                 "_is_valid",
-                when(col(column) <= 0, lit(False)).otherwise(col("_is_valid")),
+                F.when(F.col(column) <= 0, F.lit(False)).otherwise(F.col("_is_valid")),
             )
             result = result.withColumn(
                 "_validation_errors",
-                when(
-                    col(column) <= 0,
-                    concat_with_separator(col("_validation_errors"), f"{column}:not_positive"),
-                ).otherwise(col("_validation_errors")),
+                F.when(
+                    F.col(column) <= 0,
+                    concat_with_separator(F.col("_validation_errors"), f"{column}:not_positive"),
+                ).otherwise(F.col("_validation_errors")),
             )
 
         elif rule_type == "in_list":
             allowed_values = rule.get("values", [])
             result = result.withColumn(
                 "_is_valid",
-                when(~col(column).isin(allowed_values), lit(False)).otherwise(col("_is_valid")),
+                F.when(~F.col(column).isin(allowed_values), F.lit(False)).otherwise(
+                    F.col("_is_valid")
+                ),
             )
 
         elif rule_type == "regex":
             pattern = rule.get("pattern", ".*")
             result = result.withColumn(
                 "_is_valid",
-                when(
-                    ~col(column).rlike(pattern),
-                    lit(False),
-                ).otherwise(col("_is_valid")),
+                F.when(
+                    ~F.col(column).rlike(pattern),
+                    F.lit(False),
+                ).otherwise(F.col("_is_valid")),
             )
 
     # Separa registros validos e invalidos
-    valid_df = result.filter(col("_is_valid")).drop("_is_valid", "_validation_errors")
-    quarantine_df = result.filter(~col("_is_valid")).drop("_is_valid")
+    valid_df = result.filter(F.col("_is_valid")).drop("_is_valid", "_validation_errors")
+    quarantine_df = result.filter(~F.col("_is_valid")).drop("_is_valid")
 
     # Adiciona timestamp de quarentena
-    quarantine_df = quarantine_df.withColumn("_quarantine_timestamp", current_timestamp())
+    quarantine_df = quarantine_df.withColumn("_quarantine_timestamp", F.current_timestamp())
 
     return valid_df, quarantine_df
 
 
 def concat_with_separator(existing_col, new_value: str):
     """Helper para concatenar erros de validacao."""
-    from pyspark.sql.functions import concat, length, lit, when
-
-    return when(
-        length(existing_col) > 0,
-        concat(existing_col, lit("; "), lit(new_value)),
-    ).otherwise(lit(new_value))
+    return F.when(
+        F.length(existing_col) > 0,
+        F.concat(existing_col, F.lit("; "), F.lit(new_value)),
+    ).otherwise(F.lit(new_value))
 
 
 def merge_with_existing(
@@ -212,7 +203,7 @@ def merge_with_existing(
             on=pk_column,
             how="inner",
         )
-        .filter(col(f"new.{hash_column}") != col(f"existing.{hash_column}"))
+        .filter(F.col(f"new.{hash_column}") != F.col(f"existing.{hash_column}"))
         .select("new.*")
     )
 
@@ -224,7 +215,7 @@ def merge_with_existing(
             on=pk_column,
             how="inner",
         )
-        .filter(col(f"new.{hash_column}") == col(f"existing.{hash_column}"))
+        .filter(F.col(f"new.{hash_column}") == F.col(f"existing.{hash_column}"))
         .select("existing.*")
     )
 
