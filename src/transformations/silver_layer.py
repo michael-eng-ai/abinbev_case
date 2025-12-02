@@ -8,14 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    DateType,
-    DoubleType,
-    IntegerType,
-    LongType,
-    StringType,
-    TimestampType,
-)
+from pyspark.sql.types import DateType, DoubleType, IntegerType, LongType, StringType, TimestampType
 
 
 def clean_string_columns(df: DataFrame, columns: Optional[List[str]] = None) -> DataFrame:
