@@ -5,9 +5,8 @@
 | Item | Valor |
 |------|-------|
 | Candidato | Michael Santos |
-| Data Inicio | 30/11/2024 |
+| Data Inicio | 28/11/2024 |
 | Prazo | Ate 4 dias uteis |
-| Apresentacao | 45 min (30 min solucao + 15 min Q&A) |
 
 ---
 
