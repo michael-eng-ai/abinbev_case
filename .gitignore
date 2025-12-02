@@ -49,7 +49,7 @@ crash.log
 terraform.tfvars
 
 # Data files
-data/
+#data/
 *.csv
 *.parquet
 
