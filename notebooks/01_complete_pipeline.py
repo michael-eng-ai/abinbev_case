@@ -19,6 +19,8 @@
 
 # COMMAND ----------
 
+from pathlib import Path
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
@@ -57,10 +59,11 @@ print(f"Spark Version: {spark.version}")
 # COMMAND ----------
 
 # Configuracao de Paths
-# Ajuste conforme seu ambiente
+# Detecta automaticamente o diretorio raiz do projeto
 
-# Para execucao local
-BASE_PATH = "/Users/michaelsantos/Documents/GitHub/abinbev_case"
+# Usa pathlib para obter o caminho relativo ao arquivo atual
+# Funciona em qualquer maquina, independente do usuario
+BASE_PATH = str(Path(__file__).parent.parent.resolve())
 
 # Paths de dados
 SOURCE_PATH = f"{BASE_PATH}/ABI DENG Recrutiment Business Case 1 20210727"
