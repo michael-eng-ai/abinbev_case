@@ -184,8 +184,9 @@ class TestGoldLayer:
 
         assert "hl_qty_sum" in result.columns
         assert "transaction_count_sum" in result.columns
-        # Deveria ter 3 combinacoes unicas de regiao + mes
-        assert result.count() == 3
+        # Deveria ter 2 combinacoes unicas de regiao + mes
+        # REG1+202101 e REG2+202102
+        assert result.count() == 2
 
     def test_create_dimension_table(self, sample_sales_data):
         """Testa criacao de tabela dimensao."""
