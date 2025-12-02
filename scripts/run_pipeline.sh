@@ -33,6 +33,15 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
+# Ajusta opcoes de JVM para compatibilidade com JDK 21+
+JAVA_OPEN_OPTS="--add-opens=java.base/java.lang=ALL-UNNAMED \
+--add-opens=java.base/java.security=ALL-UNNAMED \
+--add-opens=java.base/javax.security.auth=ALL-UNNAMED \
+-Djava.security.manager=allow"
+
+export SPARK_SUBMIT_OPTS="${SPARK_SUBMIT_OPTS} ${JAVA_OPEN_OPTS}"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${JAVA_OPEN_OPTS}"
+
 # Verifica se .env existe
 if [ ! -f ".env" ]; then
     echo "[WARN] Arquivo .env nao encontrado. Usando config/env.example..."

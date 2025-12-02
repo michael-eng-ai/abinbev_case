@@ -6,7 +6,7 @@
 # - Resource Group
 # - Storage Account (Data Lake Gen2)
 # - HDInsight Spark Cluster com Autoscaling
-# - Azure Data Factory
+# - Apache Airflow (orquestracao)
 # - Stack de Observabilidade (Prometheus, Grafana, Loki)
 # - Governanca de Dados (OpenMetadata)
 #
@@ -117,20 +117,23 @@ module "hdinsight" {
 }
 
 # ------------------------------------------------------------------------------
-# Data Factory Module
+# Airflow Module (Orquestracao)
 # ------------------------------------------------------------------------------
 
-module "data_factory" {
-  source = "./modules/data_factory"
+module "airflow" {
+  source = "./modules/airflow"
+  count  = var.airflow_enabled ? 1 : 0
 
-  resource_group_name   = azurerm_resource_group.main.name
-  location              = azurerm_resource_group.main.location
-  data_factory_name     = "${var.data_factory_name}-${random_string.suffix.result}"
-  hdinsight_cluster_id  = module.hdinsight.cluster_id
-  storage_account_name  = module.storage.storage_account_name
-  storage_account_key   = module.storage.storage_account_key
-  pipeline_schedule     = var.pipeline_schedule_time
-  tags                  = local.common_tags
+  prefix               = local.resource_prefix
+  resource_group_name  = azurerm_resource_group.main.name
+  location             = azurerm_resource_group.main.location
+  storage_account_name = module.storage.storage_account_name
+  storage_account_key  = module.storage.storage_account_key
+  storage_account_id   = module.storage.storage_account_id
+  db_password          = var.airflow_db_password
+  fernet_key           = var.airflow_fernet_key
+  secret_key           = var.airflow_secret_key
+  tags                 = local.common_tags
 }
 
 # ------------------------------------------------------------------------------

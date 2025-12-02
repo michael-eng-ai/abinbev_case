@@ -110,6 +110,19 @@ BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 print(f"[INFO] Batch ID: {BATCH_ID}")
 
 # %%
+# Process Control - Registro de execucoes
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+    from control.process_control import ProcessControl, QuarantineManager
+    process_control = ProcessControl(spark, PATHS["control"])
+    quarantine_manager = QuarantineManager(spark, PATHS["control"])
+    PROCESS_CONTROL_ENABLED = True
+    print("[INFO] Process Control habilitado")
+except ImportError:
+    PROCESS_CONTROL_ENABLED = False
+    print("[WARN] Process Control nao disponivel")
+
+# %%
 # ==============================================================================
 # Funcoes de CDC Merge
 # ==============================================================================
@@ -505,6 +518,39 @@ save_silver(merged_channels, "silver_channel_features")
 
 # %%
 # ==============================================================================
+# Registro no Process Control
+# ==============================================================================
+
+sales_final_count = merged_sales.count()
+channels_final_count = merged_channels.count()
+
+# Conta registros em quarentena (aproximado baseado nas stats)
+quarantine_count = sales_stats.get('source_count', 0) - sales_stats.get('inserted', 0) - sales_stats.get('updated', 0) - sales_stats.get('unchanged', 0)
+quarantine_count = max(0, quarantine_count)
+
+if PROCESS_CONTROL_ENABLED:
+    # Registra processamento de sales
+    process_control.start_process(BATCH_ID, "silver", "silver_sales_enriched")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=sales_stats.get('source_count', 0),
+        records_written=sales_final_count,
+        records_quarantined=quarantine_count,
+        records_failed=0
+    )
+    
+    # Registra processamento de channels
+    process_control.start_process(BATCH_ID, "silver", "silver_channel_features")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=channels_stats.get('source_count', 0),
+        records_written=channels_final_count,
+        records_quarantined=0,
+        records_failed=0
+    )
+
+# %%
+# ==============================================================================
 # Resumo
 # ==============================================================================
 
@@ -514,14 +560,15 @@ print("=" * 60)
 print(f"Batch ID: {BATCH_ID}")
 print(f"Ambiente: {ENVIRONMENT}")
 print(f"\nsilver_sales_enriched:")
-print(f"  Total final: {merged_sales.count()} registros")
+print(f"  Total final: {sales_final_count} registros")
 print(f"  INSERTs:     {sales_stats['inserted']}")
 print(f"  UPDATEs:     {sales_stats['updated']}")
 print(f"  SKIPs:       {sales_stats['unchanged']}")
 print(f"\nsilver_channel_features:")
-print(f"  Total final: {merged_channels.count()} registros")
+print(f"  Total final: {channels_final_count} registros")
 print(f"  INSERTs:     {channels_stats['inserted']}")
 print(f"  UPDATEs:     {channels_stats['updated']}")
 print(f"  SKIPs:       {channels_stats['unchanged']}")
+print(f"\nProcess Control: {'Registrado' if PROCESS_CONTROL_ENABLED else 'Desabilitado'}")
 print("=" * 60)
 print("[OK] Silver transformation concluida com sucesso!")

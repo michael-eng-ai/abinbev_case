@@ -127,19 +127,34 @@ variable "hdinsight_ssh_password" {
 }
 
 # ------------------------------------------------------------------------------
-# Data Factory
+# Airflow
 # ------------------------------------------------------------------------------
 
-variable "data_factory_name" {
-  description = "Nome do Azure Data Factory"
-  type        = string
-  default     = "abinbev-adf"
+variable "airflow_enabled" {
+  description = "Habilitar Apache Airflow para orquestracao"
+  type        = bool
+  default     = true
 }
 
-variable "pipeline_schedule_time" {
-  description = "Horario de execucao do pipeline (UTC)"
+variable "airflow_db_password" {
+  description = "Password do PostgreSQL para Airflow"
   type        = string
-  default     = "02:00"
+  sensitive   = true
+  default     = "Airflow@123456"
+}
+
+variable "airflow_fernet_key" {
+  description = "Fernet key para criptografia do Airflow (gerar com: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "airflow_secret_key" {
+  description = "Secret key para o webserver do Airflow"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 # ------------------------------------------------------------------------------

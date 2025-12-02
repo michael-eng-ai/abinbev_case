@@ -129,6 +129,17 @@ BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 print(f"[INFO] Batch ID: {BATCH_ID}")
 
 # %%
+# Process Control - Registro de execucoes
+try:
+    from control.process_control import ProcessControl
+    process_control = ProcessControl(spark, PATHS["control"])
+    PROCESS_CONTROL_ENABLED = True
+    print("[INFO] Process Control habilitado")
+except ImportError:
+    PROCESS_CONTROL_ENABLED = False
+    print("[WARN] Process Control nao disponivel")
+
+# %%
 # ==============================================================================
 # Funcoes de CDC (Change Data Capture)
 # ==============================================================================
@@ -412,6 +423,35 @@ print(f"    PKs unicas: {pk_count_channels}")
 print(f"    Duplicatas: {total_channels - pk_count_channels}")
 
 # %%
+# ==============================================================================
+# Registro no Process Control
+# ==============================================================================
+
+sales_count = bronze_sales.count()
+channels_count = bronze_channels.count()
+
+if PROCESS_CONTROL_ENABLED:
+    # Registra processamento de sales
+    process_control.start_process(BATCH_ID, "bronze", "bronze_beverage_sales")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=sales_count,
+        records_written=sales_count,
+        records_quarantined=0,
+        records_failed=0
+    )
+    
+    # Registra processamento de channels
+    process_control.start_process(BATCH_ID, "bronze", "bronze_channel_features")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=channels_count,
+        records_written=channels_count,
+        records_quarantined=0,
+        records_failed=0
+    )
+
+# %%
 # Resumo
 
 print("\n" + "=" * 60)
@@ -421,14 +461,15 @@ print(f"Batch ID: {BATCH_ID}")
 print(f"Ambiente: {ENVIRONMENT}")
 print(f"Modo: {mode}")
 print(f"\nbronze_beverage_sales:")
-print(f"  Registros: {bronze_sales.count()}")
+print(f"  Registros: {sales_count}")
 print(f"  PK columns: {SALES_PK_COLUMNS}")
 print(f"\nbronze_channel_features:")
-print(f"  Registros: {bronze_channels.count()}")
+print(f"  Registros: {channels_count}")
 print(f"  PK columns: {CHANNEL_PK_COLUMNS}")
 print(f"\nCampos de CDC adicionados:")
 print(f"  _pk: Hash MD5 das colunas de identificacao")
 print(f"  _row_hash: Hash SHA256 das colunas de negocio")
 print(f"  _updated_at: Timestamp de atualizacao")
+print(f"\nProcess Control: {'Registrado' if PROCESS_CONTROL_ENABLED else 'Desabilitado'}")
 print("=" * 60)
 print("[OK] Bronze ingestion concluida com sucesso!")

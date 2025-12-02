@@ -1,0 +1,64 @@
+# Prometheus Configuration for ABInBev Case
+# ============================================
+# Configuracao do Prometheus para coletar metricas do Spark e da aplicacao.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+  # Labels globais para todas as metricas
+  external_labels:
+    project: 'abinbev_case'
+    environment: 'development'
+
+# Regras de alertas
+rule_files:
+  - 'alert_rules.yml'
+
+# Configuracao do Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - 'alertmanager:9093'
+
+# Configuracao de coleta de metricas
+scrape_configs:
+  # Metricas do Prometheus
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Metricas do Spark Driver
+  - job_name: 'spark-driver'
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets: ['localhost:4040']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '(.+):\d+'
+        replacement: '${1}'
+
+  # Metricas do Spark Executors
+  - job_name: 'spark-executors'
+    metrics_path: '/metrics/prometheus'
+    static_configs:
+      - targets: ['localhost:4041', 'localhost:4042']
+
+  # Metricas da aplicacao Python (prometheus_client)
+  - job_name: 'python-app'
+    static_configs:
+      - targets: ['localhost:8000']
+
+  # Metricas do Node Exporter (sistema)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # Metricas do Airflow
+  - job_name: 'airflow'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/admin/metrics'
+

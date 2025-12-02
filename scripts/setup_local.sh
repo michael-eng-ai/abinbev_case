@@ -47,8 +47,19 @@ mkdir -p logs
 echo ""
 echo "[5/5] Configurando arquivo .env..."
 if [ ! -f ".env" ]; then
-    cp .env.example .env
-    echo "      Arquivo .env criado a partir do .env.example"
+    if [ -f "config/env.example" ]; then
+        cp config/env.example .env
+        echo "      Arquivo .env criado a partir do config/env.example"
+    else
+        echo "      Criando .env padrao..."
+        cat > .env << EOF
+# ABInBev Case - Environment Variables
+ENVIRONMENT=local
+SPARK_DRIVER_MEMORY=4g
+AZURE_STORAGE_ACCOUNT_NAME=abinbevdatalake
+GOVERNANCE_ENABLED=false
+EOF
+    fi
     echo "      IMPORTANTE: Edite o arquivo .env com suas configuracoes"
 else
     echo "      Arquivo .env ja existe."

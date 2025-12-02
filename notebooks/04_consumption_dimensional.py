@@ -54,12 +54,14 @@ def get_paths():
         return {
             "gold": str(project_root / "data" / "gold"),
             "consumption": str(project_root / "data" / "consumption"),
+            "control": str(project_root / "data" / "control"),
         }
     else:
         account = os.getenv("AZURE_STORAGE_ACCOUNT_NAME", "abinbevdatalake")
         return {
             "gold": f"abfss://gold@{account}.dfs.core.windows.net",
             "consumption": f"abfss://consumption@{account}.dfs.core.windows.net",
+            "control": f"abfss://control@{account}.dfs.core.windows.net",
         }
 
 PATHS = get_paths()
@@ -94,6 +96,17 @@ def get_spark_session():
 spark = get_spark_session()
 BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 print(f"[INFO] Batch ID: {BATCH_ID}")
+
+# %%
+# Process Control - Registro de execucoes
+try:
+    from control.process_control import ProcessControl
+    process_control = ProcessControl(spark, PATHS["control"])
+    PROCESS_CONTROL_ENABLED = True
+    print("[INFO] Process Control habilitado")
+except ImportError:
+    PROCESS_CONTROL_ENABLED = False
+    print("[WARN] Process Control nao disponivel")
 
 # %%
 # Funcoes auxiliares
@@ -535,6 +548,44 @@ save_consumption(agg_brand_month, "agg_sales_brand_month")
 save_consumption(agg_brand_region, "agg_sales_brand_region")
 
 # %%
+# ==============================================================================
+# Registro no Process Control
+# ==============================================================================
+
+# Contagens
+dim_date_count = dim_date.count()
+dim_region_count = dim_region.count()
+dim_product_count = dim_product.count()
+dim_channel_count = dim_channel.count()
+fact_sales_count = fact_sales.count()
+agg_trade_groups_count = agg_trade_groups.count()
+agg_brand_month_count = agg_brand_month.count()
+agg_brand_region_count = agg_brand_region.count()
+
+if PROCESS_CONTROL_ENABLED:
+    # Registra cada tabela
+    tables = [
+        ("dim_date", dim_date_count),
+        ("dim_region", dim_region_count),
+        ("dim_product", dim_product_count),
+        ("dim_channel", dim_channel_count),
+        ("fact_sales", fact_sales_count),
+        ("agg_sales_region_tradegroup", agg_trade_groups_count),
+        ("agg_sales_brand_month", agg_brand_month_count),
+        ("agg_sales_brand_region", agg_brand_region_count),
+    ]
+    
+    for table_name, count in tables:
+        process_control.start_process(BATCH_ID, "consumption", table_name)
+        process_control.end_process(
+            status="SUCCESS",
+            records_read=count,
+            records_written=count,
+            records_quarantined=0,
+            records_failed=0
+        )
+
+# %%
 # Resumo Final
 print("\n" + "=" * 60)
 print("CONSUMPTION DIMENSIONAL MODEL - RESUMO")
@@ -542,16 +593,17 @@ print("=" * 60)
 print(f"Batch ID: {BATCH_ID}")
 print(f"Ambiente: {ENVIRONMENT}")
 print(f"\nDimensoes:")
-print(f"  dim_date: {dim_date.count()} registros")
-print(f"  dim_region: {dim_region.count()} registros")
-print(f"  dim_product: {dim_product.count()} registros")
-print(f"  dim_channel: {dim_channel.count()} registros")
+print(f"  dim_date: {dim_date_count} registros")
+print(f"  dim_region: {dim_region_count} registros")
+print(f"  dim_product: {dim_product_count} registros")
+print(f"  dim_channel: {dim_channel_count} registros")
 print(f"\nFato:")
-print(f"  fact_sales: {fact_sales.count()} registros")
+print(f"  fact_sales: {fact_sales_count} registros")
 print(f"\nAgregacoes:")
-print(f"  agg_sales_region_tradegroup: {agg_trade_groups.count()} registros")
-print(f"  agg_sales_brand_month: {agg_brand_month.count()} registros")
-print(f"  agg_sales_brand_region: {agg_brand_region.count()} registros")
+print(f"  agg_sales_region_tradegroup: {agg_trade_groups_count} registros")
+print(f"  agg_sales_brand_month: {agg_brand_month_count} registros")
+print(f"  agg_sales_brand_region: {agg_brand_region_count} registros")
+print(f"\nProcess Control: {'Registrado' if PROCESS_CONTROL_ENABLED else 'Desabilitado'}")
 print("=" * 60)
 print("[OK] Consumption dimensional model concluido com sucesso!")
 print("\nPipeline completo: Landing -> Bronze -> Silver -> Gold -> Consumption")

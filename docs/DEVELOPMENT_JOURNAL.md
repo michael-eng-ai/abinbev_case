@@ -22,7 +22,8 @@
 4. Queries para responder 3 perguntas de negocio
 
 **Stack Implementada**:
-- Cloud: Azure (HDInsight + Data Factory + ADLS Gen2)
+- Cloud: Azure (HDInsight + ADLS Gen2)
+- Orquestracao: Apache Airflow (pipelines-as-code)
 - Processamento: PySpark
 - Formato: Delta Lake
 - Observabilidade: Prometheus + Grafana + Loki
@@ -183,6 +184,13 @@
 | 01/12/2024 | Governanca (OpenMetadata) | Concluido |
 | 01/12/2024 | CDC (PK + row_hash) implementado | Concluido |
 | 01/12/2024 | UPSERT incremental na Silver | Concluido |
+| 02/12/2024 | Migracao ADF -> Apache Airflow | Concluido |
+| 02/12/2024 | CI/CD com GitHub Actions | Concluido |
+| 02/12/2024 | Poetry para gerenciamento de dependencias | Concluido |
+| 02/12/2024 | Modulos de transformacao reutilizaveis | Concluido |
+| 02/12/2024 | ProcessControl integrado aos notebooks | Concluido |
+| 02/12/2024 | Testes unitarios com pytest | Concluido |
+| 02/12/2024 | Revisao geral codigo vs documentacao | Concluido |
 
 ---
 
@@ -190,6 +198,11 @@
 
 ```
 abinbev_case/
+  .github/
+    workflows/
+      ci.yml                    # CI/CD Pipeline
+  dags/
+    abinbev_case_pipeline.py    # Airflow DAG
   infrastructure/
     terraform/
       main.tf
@@ -199,37 +212,37 @@ abinbev_case/
       modules/
         storage/
         hdinsight/
-        data_factory/
+        airflow/                # Substituiu data_factory
         observability/
         governance/
   notebooks/
-    01_bronze_ingestion.py
-    02_silver_transformation.py
-    03_gold_business_rules.py
-    04_consumption_dimensional.py
-  scripts/
-    setup_local.sh
-    run_pipeline.sh
+    01_bronze_ingestion.py      # Com ProcessControl
+    02_silver_transformation.py # Com ProcessControl
+    03_gold_business_rules.py   # Com ProcessControl
+    04_consumption_dimensional.py # Com ProcessControl
   src/
-    config/
-      settings.py
+    transformations/            # Funcoes reutilizaveis
+      bronze_layer.py
+      silver_layer.py
+      gold_layer.py
+    control/
+      process_control.py        # Tabela de controle
     governance/
-      openmetadata_client.py
+      ingest_metadata.py
   config/
     config.yaml
-    env.example
-    governance_policies.yaml
+    prometheus.yml
+    alert_rules.yml
+    grafana_spark_dashboard.json
+  tests/
+    conftest.py
+    test_transformations.py
   docs/
     ARCHITECTURE.md
     DATA_DICTIONARY.md
     DEVELOPMENT_JOURNAL.md
-  data/
-    landing/
-    bronze/
-    silver/
-    gold/
-    consumption/
-    control/
+  pyproject.toml               # Poetry
+  .gitignore
 ```
 
 ---
@@ -266,8 +279,35 @@ abinbev_case/
 - [x] Documentacao atualizada
 - [x] Governanca (OpenMetadata)
 - [x] CDC (PK + row_hash)
-- [ ] Teste de execucao end-to-end
+- [x] CI/CD com GitHub Actions
+- [x] Apache Airflow para orquestracao
+- [x] ProcessControl para rastreabilidade
+- [x] Testes unitarios
+- [ ] Teste de execucao end-to-end (requer Java 11/17)
 
 ---
 
-Ultima atualizacao: 01/12/2024
+## Notas Tecnicas
+
+### Requisitos para Execucao Local
+
+- Python 3.10+
+- Java 11 ou 17 (Java 24 NAO e compativel com PySpark 4.0)
+- Poetry para gerenciamento de dependencias
+
+### Comandos Uteis
+
+```bash
+# Instalar dependencias
+poetry install
+
+# Executar testes (requer Java 11/17)
+poetry run pytest tests/ -v
+
+# Executar pipeline
+poetry run python notebooks/01_bronze_ingestion.py
+```
+
+---
+
+Ultima atualizacao: 02/12/2024

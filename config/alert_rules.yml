@@ -1,0 +1,85 @@
+# Prometheus Alert Rules for ABInBev Case
+# =========================================
+
+groups:
+  - name: spark_alerts
+    interval: 30s
+    rules:
+      - alert: SparkJobFailed
+        expr: spark_job_status == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Spark job failed"
+          description: "Spark job {{ $labels.job_name }} has failed."
+
+      - alert: SparkExecutorDown
+        expr: up{job="spark-executors"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Spark executor is down"
+          description: "Spark executor {{ $labels.instance }} has been down for more than 2 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (spark_executor_memory_used / spark_executor_memory_total) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on Spark executor"
+          description: "Executor {{ $labels.executor_id }} is using more than 90% of allocated memory."
+
+  - name: pipeline_alerts
+    interval: 1m
+    rules:
+      - alert: PipelineStageSlowdown
+        expr: pipeline_stage_duration_seconds > 3600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pipeline stage taking too long"
+          description: "Stage {{ $labels.stage }} has been running for more than 1 hour."
+
+      - alert: DataQualityIssues
+        expr: increase(quarantine_records_total[1h]) > 100
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of quarantined records"
+          description: "More than 100 records were quarantined in the last hour."
+
+      - alert: ProcessingFailure
+        expr: process_control_status == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Data processing failure"
+          description: "Processing {{ $labels.table_name }} in layer {{ $labels.layer }} has failed."
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage on {{ $labels.instance }} is above 80%."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space on {{ $labels.mountpoint }} is below 10%."
+

@@ -7,12 +7,14 @@ Este documento descreve a arquitetura tecnica da plataforma de analytics de vend
 **Stack Tecnologico**:
 - Cloud: Microsoft Azure (portavel para outras clouds)
 - Processamento: Azure HDInsight (Apache Spark)
-- Orquestracao: Azure Data Factory
+- Orquestracao: Apache Airflow (pipelines-as-code)
 - Armazenamento: Azure Data Lake Storage Gen2
 - Formato: Delta Lake
 - Infraestrutura como Codigo: Terraform
-- Observabilidade: Prometheus + Grafana + Loki (open source)
+- Observabilidade: Prometheus + Grafana + Loki + OpenTelemetry (open source)
 - Governanca: OpenMetadata (open source)
+- CI/CD: GitHub Actions
+- Gerenciamento de Dependencias: Poetry
 
 **Modo de Processamento**: Batch (nao ha requisito de real-time no case)
 
@@ -31,17 +33,18 @@ Este documento descreve a arquitetura tecnica da plataforma de analytics de vend
 
 **Decisao**: HDInsight para manter portabilidade entre clouds. Se futuramente a empresa optar por Databricks, a migracao sera simples pois o codigo Spark e compativel.
 
-### 2.2 Por que Azure Data Factory para Orquestracao?
+### 2.2 Por que Apache Airflow para Orquestracao?
 
 | Criterio | Justificativa |
 |----------|---------------|
-| Integracao nativa | Conecta diretamente com HDInsight e Data Lake |
-| Agendamento | Triggers por tempo (cron) ou evento (arquivo chegou) |
-| Sequenciamento | Pipelines com dependencias entre atividades |
-| Monitoramento | Logs, alertas e retry automatico |
-| Low-code | Interface visual para pipelines, reduz complexidade |
+| Pipelines-as-Code | DAGs definidos em Python, versionados no Git |
+| Portabilidade | Funciona em qualquer cloud ou on-premise |
+| Comunidade | Padrao de mercado, ampla documentacao e suporte |
+| Testabilidade | DAGs podem ser testados como codigo Python |
+| Extensibilidade | Milhares de providers e operadores disponiveis |
+| Visibilidade | UI web para monitoramento e troubleshooting |
 
-**Alternativa considerada**: Apache Airflow. Foi descartado para MVP por adicionar complexidade de infraestrutura (AKS ou Container Instances).
+**Alternativa considerada**: Azure Data Factory. Descartado por ser especifico da Azure (vendor lock-in) e nao suportar pipelines-as-code nativamente.
 
 ### 2.3 Por que Delta Lake?
 
@@ -635,63 +638,51 @@ Tabelas pre-calculadas para responder as perguntas de negocio do case.
 | Gold | Silver | Silver.status = SUCCESS |
 | Consumption | Gold | Gold.status = SUCCESS |
 
-### 5.2 Configuracao no Azure Data Factory
+### 5.2 Configuracao no Apache Airflow
 
-```json
-{
-  "pipeline": "pipeline_beverage_analytics",
-  "activities": [
-    {
-      "name": "01_bronze_ingestion",
-      "type": "HDInsightSpark",
-      "dependsOn": [],
-      "policy": {
-        "timeout": "02:00:00",
-        "retry": 3,
-        "retryIntervalInSeconds": 300
-      }
-    },
-    {
-      "name": "02_silver_transformation",
-      "type": "HDInsightSpark",
-      "dependsOn": [
-        {
-          "activity": "01_bronze_ingestion",
-          "dependencyConditions": ["Succeeded"]
-        }
-      ]
-    },
-    {
-      "name": "03_gold_business_rules",
-      "type": "HDInsightSpark",
-      "dependsOn": [
-        {
-          "activity": "02_silver_transformation",
-          "dependencyConditions": ["Succeeded"]
-        }
-      ]
-    },
-    {
-      "name": "04_consumption_dimensional",
-      "type": "HDInsightSpark",
-      "dependsOn": [
-        {
-          "activity": "03_gold_business_rules",
-          "dependencyConditions": ["Succeeded"]
-        }
-      ]
-    }
-  ],
-  "trigger": {
-    "type": "ScheduleTrigger",
-    "recurrence": {
-      "frequency": "Day",
-      "interval": 1,
-      "startTime": "2024-12-01T02:00:00Z",
-      "timeZone": "UTC"
-    }
-  }
+```python
+# dags/abinbev_case_pipeline.py
+from airflow.models.dag import DAG
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from datetime import datetime, timedelta
+
+default_args = {
+    "owner": "data-engineering",
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
+    "execution_timeout": timedelta(hours=2),
 }
+
+with DAG(
+    dag_id="abinbev_case_medallion",
+    start_date=datetime(2025, 1, 1),
+    schedule_interval="@daily",  # 02:00 UTC configuravel
+    catchup=False,
+    default_args=default_args,
+) as dag:
+
+    bronze = SparkSubmitOperator(
+        task_id="bronze_ingestion",
+        application="notebooks/01_bronze_ingestion.py",
+    )
+
+    silver = SparkSubmitOperator(
+        task_id="silver_transformation",
+        application="notebooks/02_silver_transformation.py",
+    )
+
+    gold = SparkSubmitOperator(
+        task_id="gold_business_rules",
+        application="notebooks/03_gold_business_rules.py",
+    )
+
+    consumption = SparkSubmitOperator(
+        task_id="consumption_dimensional",
+        application="notebooks/04_consumption_dimensional.py",
+    )
+
+    # Dependencias sequenciais
+    bronze >> silver >> gold >> consumption
 ```
 
 ---
@@ -706,6 +697,28 @@ Tabelas pre-calculadas para responder as perguntas de negocio do case.
 | Grafana | Dashboards, visualizacao, alertas | ACI ou AKS |
 | Loki | Agregacao de logs estruturados | ACI ou AKS |
 | AlertManager | Gerenciamento e roteamento de alertas | Integrado ao Prometheus |
+| OpenTelemetry | Tracing distribuido | SDK Python |
+
+### 6.2 Tracing Distribuido (OpenTelemetry)
+
+OpenTelemetry instrumenta o codigo PySpark para rastrear a execucao de cada etapa:
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+
+with tracer.start_as_current_span("silver_transformation"):
+    # Codigo de transformacao
+    pass
+```
+
+Beneficios:
+- Visualizacao do fluxo de execucao end-to-end
+- Identificacao de gargalos de performance
+- Correlacao entre metricas, logs e traces
 
 ### 6.2 Metricas Exportadas para Prometheus
 
@@ -865,8 +878,8 @@ Termos padronizados para toda a organizacao:
 | Resource Group | abinbev-case-rg | East US 2 |
 | Storage Account | abinbevdatalake | ADLS Gen2, LRS |
 | Containers | landing, bronze, silver, gold, consumption, control | Hierarchical namespace |
-| HDInsight Spark | abinbev-spark-cluster | Spark 3.3, 2 head + 2-10 workers |
-| Data Factory | abinbev-adf | Pipelines + Triggers |
+| HDInsight Spark | abinbev-spark-cluster | Spark 3.5, 2 head + 2-10 workers |
+| Apache Airflow | airflow-webserver | DAGs + Scheduler |
 | Container Instances | prometheus, grafana, loki | Observability stack |
 | Container Instances | openmetadata, elasticsearch | Governance stack |
 | PostgreSQL Flexible | openmetadata-db | Metadata store |
@@ -1009,7 +1022,7 @@ abinbev_case/
 | # | Data | Decisao | Motivo |
 |---|------|---------|--------|
 | 1 | 01/12/2024 | Azure HDInsight em vez de Databricks | Portabilidade entre clouds |
-| 2 | 01/12/2024 | Azure Data Factory para orquestracao | Integracao nativa, low-code |
+| 2 | 02/12/2024 | Apache Airflow para orquestracao | Pipelines-as-code, portabilidade |
 | 3 | 01/12/2024 | Delta Lake como formato | ACID, Time Travel, Schema Evolution |
 | 4 | 01/12/2024 | Padronizacao de nomes na Bronze | Padrao de engenharia, evita erros |
 | 5 | 01/12/2024 | Terraform para IaC | Reproducibilidade, versionamento |

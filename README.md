@@ -70,8 +70,8 @@ Plataforma de analytics para dados de vendas de bebidas, utilizando:
 |  +-----------------------------------------------------------------------------+  |
 |                                      |                                            |
 |  +------------------+    +------------------+    +------------------+             |
-|  |   HDInsight      |    | Data Factory     |    |   Terraform      |             |
-|  |   (Spark 3.3)    |    | (Orchestration)  |    |   (IaC)          |             |
+|  |   HDInsight      |    | Apache Airflow   |    |   Terraform      |             |
+|  |   (Spark 3.5)    |    | (Orchestration)  |    |   (IaC)          |             |
 |  |   Autoscaling    |    | Sequential       |    |                  |             |
 |  +------------------+    +------------------+    +------------------+             |
 |                                                                                    |
@@ -108,20 +108,24 @@ Bronze (historico)              Silver (atual)
 | Componente | Tecnologia | Motivo |
 |------------|------------|--------|
 | Cloud | Azure | Requisito do case |
-| Processamento | HDInsight Spark 3.3 | Portabilidade entre clouds |
-| Orquestracao | Azure Data Factory | Integracao nativa, low-code |
+| Processamento | HDInsight Spark 3.5 | Portabilidade entre clouds |
+| Orquestracao | Apache Airflow | Pipelines-as-code, padrao de mercado |
 | Storage | ADLS Gen2 + Delta Lake | ACID, Time Travel, Schema Evolution |
 | Governanca | OpenMetadata | Open source, catalogo + lineage |
-| Observabilidade | Prometheus + Grafana + Loki | Open source, portavel |
+| Observabilidade | Prometheus + Grafana + Loki + OpenTelemetry | Open source, portavel |
 | IaC | Terraform | Reproducibilidade |
+| CI/CD | GitHub Actions | Automacao de testes e deploy |
+| Dependencias | Poetry | Builds reprodutiveis |
 
 ### Por que essas escolhas?
 
 | Decisao | Alternativa | Motivo da Escolha |
 |---------|-------------|-------------------|
 | HDInsight | Databricks | Portabilidade, sem vendor lock-in |
+| Apache Airflow | Azure Data Factory | Pipelines-as-code, multi-cloud |
 | OpenMetadata | Unity Catalog | Open source, multi-cloud |
 | Prometheus/Grafana | Azure Monitor | Open source, portavel |
+| Poetry | pip/requirements.txt | Builds reprodutiveis, lockfile |
 | Batch | Streaming | Requisitos do case |
 
 ---
@@ -130,6 +134,13 @@ Bronze (historico)              Silver (atual)
 
 ```
 abinbev_case/
+|
++-- .github/
+|   +-- workflows/
+|       +-- ci.yml                    # CI/CD Pipeline
+|
++-- dags/
+|   +-- abinbev_case_pipeline.py      # Airflow DAG
 |
 +-- infrastructure/
 |   +-- terraform/
@@ -140,7 +151,6 @@ abinbev_case/
 |       +-- modules/
 |           +-- storage/
 |           +-- hdinsight/
-|           +-- data_factory/
 |           +-- observability/
 |           +-- governance/
 |
@@ -150,37 +160,31 @@ abinbev_case/
 |   +-- 03_gold_business_rules.py
 |   +-- 04_consumption_dimensional.py
 |
-+-- scripts/
-|   +-- setup_local.sh
-|   +-- run_pipeline.sh
-|
 +-- src/
-|   +-- config/
-|   |   +-- settings.py
+|   +-- transformations/              # Funcoes reutilizaveis
+|   |   +-- bronze_layer.py
+|   |   +-- silver_layer.py
+|   |   +-- gold_layer.py
 |   +-- governance/
-|       +-- openmetadata_client.py
+|       +-- ingest_metadata.py        # OpenMetadata integration
 |
 +-- config/
 |   +-- config.yaml
-|   +-- env.example
-|   +-- governance_policies.yaml
+|   +-- prometheus.yml
+|   +-- alert_rules.yml
+|   +-- grafana_spark_dashboard.json
 |
 +-- docs/
 |   +-- ARCHITECTURE.md
 |   +-- DATA_DICTIONARY.md
 |   +-- DEVELOPMENT_JOURNAL.md
 |
-+-- data/
-|   +-- landing/
-|   +-- bronze/
-|   +-- silver/
-|   +-- gold/
-|   +-- consumption/
-|   +-- control/
-|
 +-- tests/
+|   +-- conftest.py
+|   +-- test_transformations.py
 |
-+-- requirements.txt
++-- pyproject.toml                    # Poetry dependencies
++-- .gitignore
 +-- README.md
 +-- LICENSE
 ```
@@ -191,31 +195,41 @@ abinbev_case/
 
 ### Pre-requisitos
 
-- Python 3.9+
-- Java 8 ou 11 (para Spark)
+- Python 3.10+
+- Java 11 (para Spark)
+- Poetry (gerenciador de dependencias)
 - Terraform 1.0+ (para deploy Azure)
 
-### Execucao Local
+### Execucao Local com Poetry
 
 ```bash
 # 1. Clonar repositorio
 git clone https://github.com/seu-usuario/abinbev_case.git
 cd abinbev_case
 
-# 2. Setup do ambiente
-chmod +x scripts/setup_local.sh
-./scripts/setup_local.sh
+# 2. Instalar dependencias
+pip install poetry
+poetry install
 
-# 3. Ativar venv
-source venv/bin/activate
-
-# 4. Configurar variaveis (opcional)
+# 3. Configurar variaveis (opcional)
 cp config/env.example .env
 # Editar .env se necessario
 
-# 5. Executar pipeline completo
-chmod +x scripts/run_pipeline.sh
-./scripts/run_pipeline.sh
+# 4. Executar pipeline completo
+poetry run python notebooks/01_bronze_ingestion.py
+poetry run python notebooks/02_silver_transformation.py
+poetry run python notebooks/03_gold_business_rules.py
+poetry run python notebooks/04_consumption_dimensional.py
+```
+
+### Executar Testes
+
+```bash
+# Rodar todos os testes
+poetry run pytest tests/ -v
+
+# Com coverage
+poetry run pytest tests/ --cov=src --cov-report=term-missing
 ```
 
 ### Execucao Individual
@@ -352,15 +366,23 @@ Todos os registros possuem rastreabilidade completa:
 
 ## Proximos Passos
 
+### Concluido
+- [x] CI/CD com GitHub Actions
+- [x] Apache Airflow para orquestracao
+- [x] Modulo de transformacoes reutilizavel
+- [x] Testes unitarios com pytest
+- [x] Poetry para gerenciamento de dependencias
+- [x] Configuracao de observabilidade (Prometheus/Grafana)
+- [x] Integracao com OpenMetadata
+
 ### Curto Prazo
-- [ ] Testes end-to-end
+- [ ] Great Expectations para data quality
 - [ ] Dashboard Power BI
-- [ ] Alertas detalhados
+- [ ] Testes end-to-end
 
 ### Medio Prazo
 - [ ] SCD Type 2 nas dimensoes
 - [ ] Delta Live Tables
-- [ ] CI/CD com Azure DevOps
 
 ### Longo Prazo
 - [ ] Streaming com Kafka

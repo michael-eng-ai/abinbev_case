@@ -97,6 +97,17 @@ BATCH_ID = datetime.now().strftime("%Y%m%d_%H%M%S")
 print(f"[INFO] Batch ID: {BATCH_ID}")
 
 # %%
+# Process Control - Registro de execucoes
+try:
+    from control.process_control import ProcessControl
+    process_control = ProcessControl(spark, PATHS["control"])
+    PROCESS_CONTROL_ENABLED = True
+    print("[INFO] Process Control habilitado")
+except ImportError:
+    PROCESS_CONTROL_ENABLED = False
+    print("[WARN] Process Control nao disponivel")
+
+# %%
 # Funcoes auxiliares
 
 def read_silver(table_name: str) -> DataFrame:
@@ -361,14 +372,44 @@ save_gold(gold_sales, "gold_sales_enriched")
 save_gold(gold_channels, "gold_channels_enriched")
 
 # %%
+# ==============================================================================
+# Registro no Process Control
+# ==============================================================================
+
+sales_count = gold_sales.count()
+channels_count = gold_channels.count()
+
+if PROCESS_CONTROL_ENABLED:
+    # Registra processamento de sales
+    process_control.start_process(BATCH_ID, "gold", "gold_sales_enriched")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=sales_count,
+        records_written=sales_count,
+        records_quarantined=0,
+        records_failed=0
+    )
+    
+    # Registra processamento de channels
+    process_control.start_process(BATCH_ID, "gold", "gold_channels_enriched")
+    process_control.end_process(
+        status="SUCCESS",
+        records_read=channels_count,
+        records_written=channels_count,
+        records_quarantined=0,
+        records_failed=0
+    )
+
+# %%
 # Resumo
 print("\n" + "=" * 60)
 print("GOLD BUSINESS RULES - RESUMO")
 print("=" * 60)
 print(f"Batch ID: {BATCH_ID}")
 print(f"Ambiente: {ENVIRONMENT}")
-print(f"gold_sales_enriched: {gold_sales.count()} registros")
-print(f"gold_channels_enriched: {gold_channels.count()} registros")
+print(f"gold_sales_enriched: {sales_count} registros")
+print(f"gold_channels_enriched: {channels_count} registros")
+print(f"Process Control: {'Registrado' if PROCESS_CONTROL_ENABLED else 'Desabilitado'}")
 print("=" * 60)
 print("[OK] Gold business rules concluido com sucesso!")
 
