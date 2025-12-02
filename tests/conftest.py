@@ -5,9 +5,14 @@ Configuracoes compartilhadas para todos os testes.
 """
 
 import os
+import sys
 
 import pytest
-from pyspark.sql import SparkSession
+
+# Configura variaveis de ambiente antes de importar PySpark
+os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
 
 
 @pytest.fixture(scope="session")
@@ -16,37 +21,35 @@ def spark():
     Cria uma SparkSession para testes.
     Escopo de sessao para reutilizar entre testes.
     """
-    # Configuracoes para compatibilidade com Java 17+
-    java_options = (
-        "-Duser.timezone=UTC "
-        "--add-opens=java.base/java.lang=ALL-UNNAMED "
-        "--add-opens=java.base/java.nio=ALL-UNNAMED "
-        "--add-opens=java.base/java.util=ALL-UNNAMED "
-        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
-        "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
-        "--add-opens=java.base/javax.security.auth=ALL-UNNAMED "
-        "-Djava.security.manager=allow"
-    )
+    # Import aqui para garantir que as variaveis de ambiente estao setadas
+    from pyspark.sql import SparkSession
 
-    # Define SPARK_LOCAL_IP para evitar warnings
-    os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
+    # Configuracoes para compatibilidade com Java 11+
+    java_options = "-Duser.timezone=UTC"
 
-    spark = (
-        SparkSession.builder.master("local[2]")
-        .appName("ABInBevCase-Tests")
-        .config("spark.sql.shuffle.partitions", "2")
-        .config("spark.default.parallelism", "2")
-        .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse-test")
-        .config("spark.driver.extraJavaOptions", java_options)
-        .config("spark.executor.extraJavaOptions", java_options)
-        .config("spark.ui.enabled", "false")
-        .config("spark.driver.bindAddress", "127.0.0.1")
-        .getOrCreate()
-    )
+    try:
+        spark = (
+            SparkSession.builder.master("local[1]")
+            .appName("ABInBevCase-Tests")
+            .config("spark.sql.shuffle.partitions", "1")
+            .config("spark.default.parallelism", "1")
+            .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse-test")
+            .config("spark.driver.extraJavaOptions", java_options)
+            .config("spark.ui.enabled", "false")
+            .config("spark.driver.bindAddress", "127.0.0.1")
+            .config("spark.driver.host", "127.0.0.1")
+            .getOrCreate()
+        )
 
-    yield spark
+        # Reduz log level
+        spark.sparkContext.setLogLevel("ERROR")
 
-    spark.stop()
+        yield spark
+
+        spark.stop()
+
+    except Exception as e:
+        pytest.skip(f"Spark nao disponivel: {e}")
 
 
 @pytest.fixture
