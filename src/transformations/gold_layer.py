@@ -8,18 +8,22 @@ from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import (
+    avg,
     col,
+    count,
     current_timestamp,
     lit,
-    sum as spark_sum,
-    avg,
-    count,
-    max as spark_max,
-    min as spark_min,
-    when,
-    year,
+)
+from pyspark.sql.functions import max as spark_max
+from pyspark.sql.functions import min as spark_min
+from pyspark.sql.functions import (
     month,
     quarter,
+)
+from pyspark.sql.functions import sum as spark_sum
+from pyspark.sql.functions import (
+    when,
+    year,
 )
 
 
@@ -117,12 +121,19 @@ def apply_business_rules(
                 result = result.withColumn(new_column, category_expr.otherwise(lit("Unknown")))
 
         elif rule_type == "calculation":
-            expression = rule_config.get("expression", "")
-            # Avalia expressao simples
-            try:
-                result = result.withColumn(new_column, eval(expression))
-            except Exception:
-                pass  # Ignora expressoes invalidas em producao
+            # Calculos pre-definidos - evita uso de eval por seguranca
+            calc_type = rule_config.get("calc_type", "")
+            source_cols = rule_config.get("source_columns", [])
+
+            if calc_type == "sum" and len(source_cols) >= 2:
+                result = result.withColumn(new_column, col(source_cols[0]) + col(source_cols[1]))
+            elif calc_type == "multiply" and len(source_cols) >= 2:
+                result = result.withColumn(new_column, col(source_cols[0]) * col(source_cols[1]))
+            elif calc_type == "divide" and len(source_cols) >= 2:
+                result = result.withColumn(new_column, col(source_cols[0]) / col(source_cols[1]))
+            elif calc_type == "subtract" and len(source_cols) >= 2:
+                result = result.withColumn(new_column, col(source_cols[0]) - col(source_cols[1]))
+            # Adicione mais operacoes conforme necessario
 
         elif rule_type == "derived":
             source_columns = rule_config.get("source_columns", [])
@@ -130,10 +141,10 @@ def apply_business_rules(
 
             if operation == "concat":
                 from pyspark.sql.functions import concat_ws
+
                 separator = rule_config.get("separator", "_")
                 result = result.withColumn(
-                    new_column,
-                    concat_ws(separator, *[col(c) for c in source_columns])
+                    new_column, concat_ws(separator, *[col(c) for c in source_columns])
                 )
 
     return result
@@ -197,9 +208,7 @@ def create_fact_table(
     agg_expressions = []
     for col_name, agg_type in aggregations.items():
         if col_name in df.columns and agg_type in agg_funcs:
-            agg_expressions.append(
-                agg_funcs[agg_type](col_name).alias(f"{col_name}_{agg_type}")
-            )
+            agg_expressions.append(agg_funcs[agg_type](col_name).alias(f"{col_name}_{agg_type}"))
 
     return df.groupBy(*dimension_keys).agg(*agg_expressions)
 
@@ -238,4 +247,3 @@ def create_dimension_table(
     )
 
     return dim_df
-

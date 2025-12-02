@@ -3,12 +3,12 @@
 # ==============================================================================
 
 from .openmetadata_client import (
-    OpenMetadataClient,
-    LineageTracker,
     DataQualityReporter,
-    TableMetadata,
-    LineageEdge,
     DataQualityResult,
+    LineageEdge,
+    LineageTracker,
+    OpenMetadataClient,
+    TableMetadata,
     register_pipeline_lineage,
     register_table_metadata,
     report_dq_results,
@@ -25,4 +25,3 @@ __all__ = [
     "register_table_metadata",
     "report_dq_results",
 ]
-

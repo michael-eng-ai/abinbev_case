@@ -157,4 +157,3 @@ def update_layer_timestamp(df: DataFrame, layer: str) -> DataFrame:
         .withColumn("_layer", lit(layer))
         .withColumn(f"_{layer}_timestamp", current_timestamp())
     )
-

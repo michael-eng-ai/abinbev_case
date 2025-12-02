@@ -5,6 +5,7 @@ Configuracoes compartilhadas para todos os testes.
 """
 
 import os
+
 import pytest
 from pyspark.sql import SparkSession
 
@@ -26,13 +27,12 @@ def spark():
         "--add-opens=java.base/javax.security.auth=ALL-UNNAMED "
         "-Djava.security.manager=allow"
     )
-    
+
     # Define SPARK_LOCAL_IP para evitar warnings
     os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
-    
+
     spark = (
-        SparkSession.builder
-        .master("local[2]")
+        SparkSession.builder.master("local[2]")
         .appName("ABInBevCase-Tests")
         .config("spark.sql.shuffle.partitions", "2")
         .config("spark.default.parallelism", "2")
@@ -87,4 +87,3 @@ def sample_channel_data(spark):
     columns = ["trade_group", "channel_type", "is_premium", "average_order_value"]
 
     return spark.createDataFrame(data, columns)
-

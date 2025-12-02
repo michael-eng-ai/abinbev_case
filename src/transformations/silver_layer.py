@@ -169,7 +169,7 @@ def apply_data_quality_rules(
 
 def concat_with_separator(existing_col, new_value: str):
     """Helper para concatenar erros de validacao."""
-    from pyspark.sql.functions import concat, lit, when, length
+    from pyspark.sql.functions import concat, length, lit, when
 
     return when(
         length(existing_col) > 0,
@@ -205,22 +205,28 @@ def merge_with_existing(
     )
 
     # Registros atualizados (existem mas hash diferente)
-    updated_records = new_df.alias("new").join(
-        existing_df.alias("existing").select(pk_column, hash_column),
-        on=pk_column,
-        how="inner",
-    ).filter(
-        col(f"new.{hash_column}") != col(f"existing.{hash_column}")
-    ).select("new.*")
+    updated_records = (
+        new_df.alias("new")
+        .join(
+            existing_df.alias("existing").select(pk_column, hash_column),
+            on=pk_column,
+            how="inner",
+        )
+        .filter(col(f"new.{hash_column}") != col(f"existing.{hash_column}"))
+        .select("new.*")
+    )
 
     # Registros inalterados (existem e hash igual)
-    unchanged_records = existing_df.alias("existing").join(
-        new_df.alias("new").select(pk_column, hash_column),
-        on=pk_column,
-        how="inner",
-    ).filter(
-        col(f"new.{hash_column}") == col(f"existing.{hash_column}")
-    ).select("existing.*")
+    unchanged_records = (
+        existing_df.alias("existing")
+        .join(
+            new_df.alias("new").select(pk_column, hash_column),
+            on=pk_column,
+            how="inner",
+        )
+        .filter(col(f"new.{hash_column}") == col(f"existing.{hash_column}"))
+        .select("existing.*")
+    )
 
     # Registros que nao vieram no novo batch (manter)
     not_in_batch = existing_df.join(
@@ -231,9 +237,7 @@ def merge_with_existing(
 
     # Combina todos
     return (
-        new_records
-        .unionByName(updated_records)
+        new_records.unionByName(updated_records)
         .unionByName(unchanged_records)
         .unionByName(not_in_batch)
     )
-

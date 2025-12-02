@@ -5,9 +5,9 @@ Script para ingerir metadados das tabelas Delta Lake no OpenMetadata.
 Deve ser executado apos cada pipeline run para manter o catalogo atualizado.
 """
 
-import os
 import logging
-from typing import Dict, Any, Optional
+import os
+from typing import Any, Dict, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,11 +32,8 @@ def get_openmetadata_config() -> Dict[str, Any]:
                 "config": {
                     "type": "DeltaLake",
                     "metastoreConnection": {
-                        "metastoreFilePath": os.getenv(
-                            "DELTA_METASTORE_PATH",
-                            "data/"
-                        )
-                    }
+                        "metastoreFilePath": os.getenv("DELTA_METASTORE_PATH", "data/")
+                    },
                 }
             },
             "sourceConfig": {
@@ -44,23 +41,18 @@ def get_openmetadata_config() -> Dict[str, Any]:
                     "type": "DatabaseMetadata",
                     "schemaFilterPattern": {
                         "includes": ["bronze.*", "silver.*", "gold.*", "consumption.*"]
-                    }
+                    },
                 }
-            }
+            },
         },
-        "sink": {
-            "type": "metadata-rest",
-            "config": {}
-        },
+        "sink": {"type": "metadata-rest", "config": {}},
         "workflowConfig": {
             "openMetadataServerConfig": {
                 "hostPort": host,
                 "authProvider": "openmetadata" if token else "no-auth",
-                "securityConfig": {
-                    "jwtToken": token
-                } if token else {}
+                "securityConfig": {"jwtToken": token} if token else {},
             }
-        }
+        },
     }
 
     return config
@@ -75,22 +67,15 @@ def create_lineage_config() -> Dict[str, Any]:
         "source": {
             "type": "query-log-lineage",
             "serviceName": "abinbev_datalake",
-            "sourceConfig": {
-                "config": {
-                    "type": "DatabaseLineage"
-                }
-            }
+            "sourceConfig": {"config": {"type": "DatabaseLineage"}},
         },
-        "sink": {
-            "type": "metadata-rest",
-            "config": {}
-        },
+        "sink": {"type": "metadata-rest", "config": {}},
         "workflowConfig": {
             "openMetadataServerConfig": {
                 "hostPort": os.getenv("OPENMETADATA_HOST", "http://localhost:8585/api"),
-                "authProvider": "no-auth"
+                "authProvider": "no-auth",
             }
-        }
+        },
     }
 
 
@@ -119,8 +104,7 @@ def ingest_metadata() -> bool:
 
     except ImportError:
         logger.warning(
-            "OpenMetadata SDK nao instalado. "
-            "Execute: poetry add openmetadata-ingestion"
+            "OpenMetadata SDK nao instalado. " "Execute: poetry add openmetadata-ingestion"
         )
         return False
 
@@ -153,8 +137,7 @@ def ingest_lineage() -> bool:
 
     except ImportError:
         logger.warning(
-            "OpenMetadata SDK nao instalado. "
-            "Execute: poetry add openmetadata-ingestion"
+            "OpenMetadata SDK nao instalado. " "Execute: poetry add openmetadata-ingestion"
         )
         return False
 
@@ -173,36 +156,31 @@ def register_custom_properties() -> bool:
         - last_pipeline_run: Timestamp da ultima execucao do pipeline
     """
     try:
-        from metadata.ingestion.ometa.ometa_api import OpenMetadata
         from metadata.generated.schema.api.data.createCustomProperty import (
             CreateCustomPropertyRequest,
         )
+        from metadata.ingestion.ometa.ometa_api import OpenMetadata
 
         host = os.getenv("OPENMETADATA_HOST", "http://localhost:8585/api")
-        metadata = OpenMetadata(
-            config={
-                "hostPort": host,
-                "authProvider": "no-auth"
-            }
-        )
+        metadata = OpenMetadata(config={"hostPort": host, "authProvider": "no-auth"})
 
         # Propriedades customizadas a serem criadas
         custom_properties = [
             {
                 "name": "layer",
                 "description": "Medallion architecture layer",
-                "propertyType": "string"
+                "propertyType": "string",
             },
             {
                 "name": "data_quality_score",
                 "description": "Data quality score (0-100)",
-                "propertyType": "number"
+                "propertyType": "number",
             },
             {
                 "name": "last_pipeline_run",
                 "description": "Timestamp of last pipeline execution",
-                "propertyType": "timestamp"
-            }
+                "propertyType": "timestamp",
+            },
         ]
 
         for prop in custom_properties:
@@ -248,4 +226,3 @@ def main():
 if __name__ == "__main__":
     success = main()
     exit(0 if success else 1)
-

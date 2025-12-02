@@ -4,11 +4,12 @@ Unit Tests for Transformation Functions
 Testes unitarios para as funcoes de transformacao de cada camada.
 """
 
+import os
+import sys
+
 import pytest
 from pyspark.sql import Row
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.transformations.bronze_layer import (
@@ -17,15 +18,15 @@ from src.transformations.bronze_layer import (
     add_row_hash,
     standardize_column_names,
 )
-from src.transformations.silver_layer import (
-    apply_data_quality_rules,
-    clean_string_columns,
-    cast_columns,
-)
 from src.transformations.gold_layer import (
     add_business_metrics,
     create_dimension_table,
     create_fact_table,
+)
+from src.transformations.silver_layer import (
+    apply_data_quality_rules,
+    cast_columns,
+    clean_string_columns,
 )
 
 
@@ -125,7 +126,8 @@ class TestSilverLayer:
         result = cast_columns(df, {"value": "int", "date": "date"})
 
         # Verifica tipos
-        from pyspark.sql.types import IntegerType, DateType
+        from pyspark.sql.types import DateType, IntegerType
+
         assert isinstance(result.schema["value"].dataType, IntegerType)
         assert isinstance(result.schema["date"].dataType, DateType)
 
@@ -199,4 +201,3 @@ class TestGoldLayer:
         assert "_is_current" in result.columns
         # Deveria ter 3 marcas unicas
         assert result.count() == 3
-
