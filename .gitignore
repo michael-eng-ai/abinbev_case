@@ -49,9 +49,15 @@ crash.log
 terraform.tfvars
 
 # Data files
-#data/
+data/
 *.csv
 *.parquet
+
+# Test artifacts
+.coverage
+coverage.xml
+.pytest_cache/
+htmlcov/
 
 # IDE / Editor files
 .idea/
