@@ -79,6 +79,7 @@ def get_spark_session():
         .appName("ABInBev_Gold_Business_Rules")
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "4g"))
         .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0")
     )
     
     try:

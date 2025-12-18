@@ -98,6 +98,7 @@ def get_spark_session():
         .appName("ABInBev_Bronze_Ingestion")
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "4g"))
         .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0")
     )
     
     try:
@@ -292,6 +293,9 @@ def ingest_beverage_sales():
     
     # 1. Padroniza nomes
     df = standardize_column_names(df)
+    
+    # Renomeia para adequar padrao de negocio
+    df = df.withColumnRenamed("btlr_org_lvl_c_desc", "region")
     
     # 2. Gera PK (antes de adicionar audit columns)
     df = generate_pk(df, SALES_PK_COLUMNS)

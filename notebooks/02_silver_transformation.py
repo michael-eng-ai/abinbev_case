@@ -92,6 +92,7 @@ def get_spark_session():
         .appName("ABInBev_Silver_Transformation")
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "4g"))
         .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0")
     )
     
     try:
@@ -276,43 +277,8 @@ def save_silver(df: DataFrame, table_name: str):
         print(f"[OK] Salvo como Parquet")
 
 
-def save_quarantine(df: DataFrame, source_table: str, target_table: str, 
-                    error_code: str, error_desc: str, batch_id: str):
-    """Salva registros na quarentena."""
-    if df.count() == 0:
-        return
-    
-    path = f"{PATHS['control']}/quarantine"
-    
-    quarantine_df = (df
-        .withColumn("quarantine_id", F.expr("uuid()"))
-        .withColumn("batch_id", F.lit(batch_id))
-        .withColumn("source_table", F.lit(source_table))
-        .withColumn("target_table", F.lit(target_table))
-        .withColumn("record_data", F.to_json(F.struct(*df.columns)))
-        .withColumn("error_type", F.lit("VALIDATION_ERROR"))
-        .withColumn("error_code", F.lit(error_code))
-        .withColumn("error_description", F.lit(error_desc))
-        .withColumn("dq_rule_name", F.lit(error_code))
-        .withColumn("is_known_rule", F.lit(True))
-        .withColumn("reprocessed", F.lit(False))
-        .withColumn("reprocess_batch_id", F.lit(None).cast(StringType()))
-        .withColumn("created_at", F.current_timestamp())
-        .withColumn("updated_at", F.current_timestamp())
-        .select(
-            "quarantine_id", "batch_id", "source_table", "target_table",
-            "record_data", "error_type", "error_code", "error_description",
-            "dq_rule_name", "is_known_rule", "reprocessed", "reprocess_batch_id",
-            "created_at", "updated_at"
-        )
-    )
-    
-    try:
-        quarantine_df.write.format("delta").mode("append").save(path)
-    except Exception:
-        quarantine_df.write.mode("append").parquet(path)
-    
-    print(f"[WARN] {quarantine_df.count()} registros para quarentena: {error_code}")
+# Local save_quarantine removed in favor of QuarantineManager class
+
 
 
 # %%
@@ -320,39 +286,56 @@ def save_quarantine(df: DataFrame, source_table: str, target_table: str,
 # Regras de Data Quality
 # ==============================================================================
 
-def apply_dq_sales(df: DataFrame) -> DataFrame:
+def apply_dq_sales(df: DataFrame) -> Tuple[DataFrame, int]:
     """
     Aplica regras de Data Quality para sales.
+    Retorna (DataFrame validado, contagem de quarentena).
     """
     print("\n[INFO] Aplicando regras de Data Quality - Sales")
     
     total = df.count()
+    quarantined_count = 0
     
     # DQ_SALES_001: brand_nm NOT NULL
     null_brand = df.filter(F.col("brand_nm").isNull())
-    if null_brand.count() > 0:
-        save_quarantine(null_brand, "bronze_beverage_sales", "silver_beverage_sales",
-                       "DQ_SALES_001", "brand_nm nao pode ser nulo", BATCH_ID)
+    count_brand = null_brand.count()
+    if count_brand > 0:
+        quarantine_manager.save_to_quarantine(
+            df=null_brand,
+            source_table="bronze_beverage_sales",
+            target_table="silver_beverage_sales",
+            error_code="DQ_SALES_001",
+            error_description="brand_nm nao pode ser nulo",
+            batch_id=BATCH_ID
+        )
+        quarantined_count += count_brand
         df = df.filter(F.col("brand_nm").isNotNull())
     
     # DQ_SALES_002: trade_chnl_desc NOT NULL
     null_channel = df.filter(F.col("trade_chnl_desc").isNull())
-    if null_channel.count() > 0:
-        save_quarantine(null_channel, "bronze_beverage_sales", "silver_beverage_sales",
-                       "DQ_SALES_002", "trade_chnl_desc nao pode ser nulo", BATCH_ID)
+    count_channel = null_channel.count()
+    if count_channel > 0:
+        quarantine_manager.save_to_quarantine(
+            df=null_channel,
+            source_table="bronze_beverage_sales",
+            target_table="silver_beverage_sales",
+            error_code="DQ_SALES_002",
+            error_description="trade_chnl_desc nao pode ser nulo",
+            batch_id=BATCH_ID
+        )
+        quarantined_count += count_channel
         df = df.filter(F.col("trade_chnl_desc").isNotNull())
     
     # DQ_SALES_005: TRIM whitespace
     df = df.withColumn("brand_nm", F.trim(F.col("brand_nm")))
     df = df.withColumn("trade_chnl_desc", F.trim(F.col("trade_chnl_desc")))
-    df = df.withColumn("btlr_org_lvl_c_desc", F.trim(F.col("btlr_org_lvl_c_desc")))
+    df = df.withColumn("region", F.trim(F.col("region")))
     
     valid_count = df.count()
-    invalid_count = total - valid_count
     
-    print(f"[OK] Validos: {valid_count} | Quarentena: {invalid_count}")
+    print(f"[OK] Validos: {valid_count} | Quarentena: {quarantined_count}")
     
-    return df
+    return df, quarantined_count
 
 
 # %%
@@ -389,8 +372,8 @@ def transform_sales_to_silver(df: DataFrame) -> DataFrame:
             F.lpad(F.col("month").cast(StringType()), 2, "0")
         ))
         
-        # Renomeia para padrao
-        .withColumnRenamed("btlr_org_lvl_c_desc", "region")
+        # Renomeia para padrao (ja feito na Bronze)
+        # .withColumnRenamed("btlr_org_lvl_c_desc", "region")
         
         # === AUDITORIA: Atualiza para Silver ===
         # Atualiza _updated_at (nova passagem de camada)
@@ -474,7 +457,8 @@ bronze_channels = read_bronze("bronze_channel_features")
 
 # %%
 # Data Quality
-sales_valid = apply_dq_sales(bronze_sales)
+# Data Quality
+sales_valid, sales_quarantine_count = apply_dq_sales(bronze_sales)
 
 # %%
 # Transformacoes
@@ -525,8 +509,8 @@ sales_final_count = merged_sales.count()
 channels_final_count = merged_channels.count()
 
 # Conta registros em quarentena (aproximado baseado nas stats)
-quarantine_count = sales_stats.get('source_count', 0) - sales_stats.get('inserted', 0) - sales_stats.get('updated', 0) - sales_stats.get('unchanged', 0)
-quarantine_count = max(0, quarantine_count)
+# Conta registros em quarentena (capturado do DQ)
+quarantine_count = sales_quarantine_count
 
 if PROCESS_CONTROL_ENABLED:
     # Registra processamento de sales

@@ -76,3 +76,7 @@ logs/
 
 # Poetry
 poetry.lock
+
+
+# Demo folder is now public
+# demo/

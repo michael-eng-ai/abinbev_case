@@ -80,6 +80,7 @@ def get_spark_session():
         .appName("ABInBev_Consumption_Dimensional")
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "4g"))
         .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0")
     )
     
     try:
@@ -407,6 +408,7 @@ def create_agg_brand_month(fact: DataFrame, dim_product: DataFrame,
     print("\n[INFO] Criando agg_sales_brand_month")
     
     df = (fact
+        .drop("year", "month")
         .join(dim_product, on="product_key")
         .join(dim_date, on="date_key")
     )

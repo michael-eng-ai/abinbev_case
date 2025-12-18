@@ -191,77 +191,90 @@ abinbev_case/
 
 ---
 
-## Como Executar
+## Como Executar (Quick Start)
 
-### Pre-requisitos
+Este projeto foi desenhado para rodar localmente simulando um ambiente Enterprise completo.
 
+### Pré-requisitos
 - Python 3.10+
-- Java 11 (para Spark)
-- Poetry (gerenciador de dependencias)
-- Terraform 1.0+ (para deploy Azure)
+- Java 11+ (necessário para Spark)
+- Poetry (Gerenciador de Dependências)
 
-### Execucao Local com Poetry
-
+### 1. Instalação
 ```bash
-# 1. Clonar repositorio
+# Clone o repositório
 git clone https://github.com/seu-usuario/abinbev_case.git
 cd abinbev_case
 
-# 2. Instalar dependencias
-pip install poetry
-poetry install
+# Instale as dependências (incluindo Airflow e Jupyter)
+poetry install --with dev
+```
 
-# 3. Configurar variaveis (opcional)
-cp config/env.example .env
-# Editar .env se necessario
+### 2. Executando a Demonstração
+Para uma experiência completa, recomendamos seguir o **[Guia de Demonstração](demo/demo_guide.md)**, que orquestra o Airflow e o Jupyter Notebook.
 
-# 4. Executar pipeline completo
+**Resumo Rápido (Apenas Pipeline):**
+```bash
+# Executa todas as camadas sequencialmente via script
 poetry run python notebooks/01_bronze_ingestion.py
 poetry run python notebooks/02_silver_transformation.py
 poetry run python notebooks/03_gold_business_rules.py
 poetry run python notebooks/04_consumption_dimensional.py
 ```
 
-### Executar Testes
+### 3. Orquestração com Airflow (Local)
+Para replicar a orquestração oficial via Airflow:
 
+**1. Configuração Inicial (Primeira execução)**
 ```bash
-# Rodar todos os testes
-poetry run pytest tests/ -v
+export AIRFLOW_HOME="$(pwd)/airflow_local"
 
-# Com coverage
-poetry run pytest tests/ --cov=src --cov-report=term-missing
+# Inicializa o banco de dados e cria usuário admin
+poetry run airflow db migrate
+poetry run airflow users create \
+    --username admin \
+    --firstname Admin \
+    --lastname User \
+    --role Admin \
+    --email admin@example.com \
+    --password admin
 ```
 
-### Execucao Individual
+**2. Iniciando os Serviços**
+É necessário rodar em terminais separados:
 
+*Terminal 1 (Webserver):*
 ```bash
-# Bronze (Landing -> Bronze)
-python notebooks/01_bronze_ingestion.py
-
-# Silver (Bronze -> Silver + DQ)
-python notebooks/02_silver_transformation.py
-
-# Gold (Silver -> Gold + Business Rules)
-python notebooks/03_gold_business_rules.py
-
-# Consumption (Gold -> Dimensional Model)
-python notebooks/04_consumption_dimensional.py
+export AIRFLOW_HOME="$(pwd)/airflow_local"
+poetry run airflow webserver -p 8080
 ```
 
-### Deploy Azure (Terraform)
-
+*Terminal 2 (Scheduler):*
 ```bash
-cd infrastructure/terraform
-
-# Configurar variaveis
-cp terraform.tfvars.example terraform.tfvars
-# Editar terraform.tfvars
-
-# Deploy
-terraform init
-terraform plan
-terraform apply
+export AIRFLOW_HOME="$(pwd)/airflow_local"
+# Defina JAVA_HOME se necessário
+poetry run airflow scheduler
 ```
+Acesse: [http://localhost:8080](http://localhost:8080) (Login: `admin` / `admin`)
+
+### 4. Explorando os Dados
+```bash
+# Abra o notebook de consultas interativas
+poetry run jupyter notebook notebooks/interactive_queries.ipynb
+```
+
+---
+
+## Estrutura de Pastas
+- `dags/`: Definições do pipeline Airflow.
+- `notebooks/`: Scripts PySpark de transformação e análise.
+- `src/`: Código modularizado (Transformações, Governança, Controle).
+- `config/`: Arquivos de configuração (YAML) para políticas e alertas.
+- `demo/`: Guias e materiais de apresentação.
+- `data/`: (Criado automaticamente) Variável local simulando Data Lake.
+
+---
+
 
 ---
 

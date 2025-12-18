@@ -7,6 +7,7 @@ Registra metadados de cada processamento para observabilidade.
 
 import os
 import uuid
+from decimal import Decimal
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -141,7 +142,7 @@ class ProcessControl:
             {
                 "status": status,
                 "end_timestamp": end_time,
-                "duration_seconds": round(duration, 2),
+                "duration_seconds": Decimal(str(round(duration, 2))),
                 "records_read": records_read,
                 "records_written": records_written,
                 "records_quarantined": records_quarantined,
@@ -172,22 +173,9 @@ class ProcessControl:
 
         # Cria DataFrame com o registro
         record = self._current_process.copy()
-
-        # Converte timestamps para strings para criar DataFrame
-        record["start_timestamp"] = record["start_timestamp"].isoformat()
-        record["end_timestamp"] = (
-            record["end_timestamp"].isoformat() if record["end_timestamp"] else None
-        )
-        record["created_at"] = record["created_at"].isoformat()
-
-        df = self.spark.createDataFrame([record])
-
-        # Converte de volta para timestamp
-        df = (
-            df.withColumn("start_timestamp", F.to_timestamp("start_timestamp"))
-            .withColumn("end_timestamp", F.to_timestamp("end_timestamp"))
-            .withColumn("created_at", F.to_timestamp("created_at"))
-        )
+        
+        # Cria DataFrame usando o Schema definido
+        df = self.spark.createDataFrame([record], schema=self.SCHEMA)
 
         # Salva
         try:

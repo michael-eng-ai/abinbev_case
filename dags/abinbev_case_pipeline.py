@@ -10,11 +10,11 @@ from pathlib import Path
 
 from airflow.models.dag import DAG
 from airflow.operators.python import PythonOperator
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 
 # Configuracoes do projeto
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOKS_PATH = PROJECT_ROOT / "notebooks"
 
 # Argumentos padrao para todas as tasks
@@ -28,13 +28,7 @@ default_args = {
     "execution_timeout": timedelta(hours=2),
 }
 
-# Configuracoes do Spark
-spark_config = {
-    "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
-    "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
-    "spark.driver.memory": "4g",
-    "spark.executor.memory": "4g",
-}
+
 
 
 def check_source_files(**context):
@@ -77,43 +71,31 @@ with DAG(
     )
 
     # Camada Bronze - Ingestao
-    bronze_ingestion = SparkSubmitOperator(
+    bronze_ingestion = BashOperator(
         task_id="bronze_ingestion",
-        application=str(NOTEBOOKS_PATH / "01_bronze_ingestion.py"),
-        conn_id="spark_default",
-        conf=spark_config,
-        name="bronze_ingestion",
-        verbose=True,
+        bash_command=f"export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home && poetry run python {NOTEBOOKS_PATH}/01_bronze_ingestion.py",
+        cwd=str(PROJECT_ROOT),
     )
 
     # Camada Silver - Transformacao e Qualidade
-    silver_transformation = SparkSubmitOperator(
+    silver_transformation = BashOperator(
         task_id="silver_transformation",
-        application=str(NOTEBOOKS_PATH / "02_silver_transformation.py"),
-        conn_id="spark_default",
-        conf=spark_config,
-        name="silver_transformation",
-        verbose=True,
+        bash_command=f"export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home && poetry run python {NOTEBOOKS_PATH}/02_silver_transformation.py",
+        cwd=str(PROJECT_ROOT),
     )
 
     # Camada Gold - Regras de Negocio
-    gold_business_rules = SparkSubmitOperator(
+    gold_business_rules = BashOperator(
         task_id="gold_business_rules",
-        application=str(NOTEBOOKS_PATH / "03_gold_business_rules.py"),
-        conn_id="spark_default",
-        conf=spark_config,
-        name="gold_business_rules",
-        verbose=True,
+        bash_command=f"export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home && poetry run python {NOTEBOOKS_PATH}/03_gold_business_rules.py",
+        cwd=str(PROJECT_ROOT),
     )
 
     # Camada Consumption - Modelo Dimensional
-    consumption_dimensional = SparkSubmitOperator(
+    consumption_dimensional = BashOperator(
         task_id="consumption_dimensional",
-        application=str(NOTEBOOKS_PATH / "04_consumption_dimensional.py"),
-        conn_id="spark_default",
-        conf=spark_config,
-        name="consumption_dimensional",
-        verbose=True,
+        bash_command=f"export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home && poetry run python {NOTEBOOKS_PATH}/04_consumption_dimensional.py",
+        cwd=str(PROJECT_ROOT),
     )
 
     # Task final
