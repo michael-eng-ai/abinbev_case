@@ -80,3 +80,9 @@ poetry.lock
 
 # Demo folder is now public
 # demo/
+
+# Airflow Local Environment (Do not commit)
+airflow_local/
+*.db
+airflow.cfg
+unittests.cfg

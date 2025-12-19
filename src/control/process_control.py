@@ -173,7 +173,7 @@ class ProcessControl:
 
         # Cria DataFrame com o registro
         record = self._current_process.copy()
-        
+
         # Cria DataFrame usando o Schema definido
         df = self.spark.createDataFrame([record], schema=self.SCHEMA)
 
