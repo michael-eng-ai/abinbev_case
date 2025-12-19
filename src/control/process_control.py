@@ -7,8 +7,8 @@ Registra metadados de cada processamento para observabilidade.
 
 import os
 import uuid
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, Dict, Optional
 
 from pyspark.sql import DataFrame, SparkSession
