@@ -7,7 +7,9 @@ Deve ser executado apos cada pipeline run para manter o catalogo atualizado.
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
+
+from config.secrets import get_secret
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ def get_openmetadata_config() -> Dict[str, Any]:
         OPENMETADATA_TOKEN: Token de autenticacao (opcional)
     """
     host = os.getenv("OPENMETADATA_HOST", "http://localhost:8585/api")
-    token = os.getenv("OPENMETADATA_TOKEN", "")
+    token = get_secret("OPENMETADATA_TOKEN", "")
 
     config = {
         "source": {
@@ -156,14 +158,12 @@ def register_custom_properties() -> bool:
         - last_pipeline_run: Timestamp da ultima execucao do pipeline
     """
     try:
-        from metadata.generated.schema.api.data.createCustomProperty import (
-            CreateCustomPropertyRequest,
-        )
         from metadata.ingestion.ometa.ometa_api import OpenMetadata
 
         host = os.getenv("OPENMETADATA_HOST", "http://localhost:8585/api")
-        metadata = OpenMetadata(config={"hostPort": host, "authProvider": "no-auth"})
+        _metadata_client = OpenMetadata(config={"hostPort": host, "authProvider": "no-auth"})  # noqa: F841
 
+        # TODO: Implementar criacao de propriedades customizadas usando _metadata_client
         # Propriedades customizadas a serem criadas
         custom_properties = [
             {

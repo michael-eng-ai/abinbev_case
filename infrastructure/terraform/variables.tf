@@ -137,10 +137,10 @@ variable "airflow_enabled" {
 }
 
 variable "airflow_db_password" {
-  description = "Password do PostgreSQL para Airflow"
+  description = "Password do PostgreSQL para Airflow (definir via TF_VAR_airflow_db_password ou terraform.tfvars)"
   type        = string
   sensitive   = true
-  default     = "Airflow@123456"
+  # NUNCA defina senhas em código - use variáveis de ambiente ou terraform.tfvars (não versionado)
 }
 
 variable "airflow_fernet_key" {
@@ -168,10 +168,10 @@ variable "observability_enabled" {
 }
 
 variable "grafana_admin_password" {
-  description = "Password do admin do Grafana"
+  description = "Password do admin do Grafana (definir via TF_VAR_grafana_admin_password ou terraform.tfvars)"
   type        = string
   sensitive   = true
-  default     = "Admin@123456"
+  # NUNCA defina senhas em código - use variáveis de ambiente ou terraform.tfvars (não versionado)
 }
 
 # ------------------------------------------------------------------------------
@@ -191,10 +191,10 @@ variable "openmetadata_db_username" {
 }
 
 variable "openmetadata_db_password" {
-  description = "Password do PostgreSQL para OpenMetadata"
+  description = "Password do PostgreSQL para OpenMetadata (definir via TF_VAR_openmetadata_db_password ou terraform.tfvars)"
   type        = string
   sensitive   = true
-  default     = "OpenMeta@123456"
+  # NUNCA defina senhas em código - use variáveis de ambiente ou terraform.tfvars (não versionado)
 }
 
 # ------------------------------------------------------------------------------

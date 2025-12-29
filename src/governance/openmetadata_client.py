@@ -10,13 +10,14 @@
 #
 # ==============================================================================
 
-import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import requests
+
+from config.secrets import get_secret
 
 
 @dataclass
@@ -68,7 +69,7 @@ class OpenMetadataClient:
     def __init__(self):
         """Inicializa o cliente."""
         self.base_url = os.getenv("OPENMETADATA_URL", "http://localhost:8585/api/v1")
-        self.auth_token = os.getenv("OPENMETADATA_TOKEN", "")
+        self.auth_token = get_secret("OPENMETADATA_TOKEN", "")
         self.enabled = os.getenv("GOVERNANCE_ENABLED", "true").lower() == "true"
 
         self.headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -185,9 +186,8 @@ class OpenMetadataClient:
             }
         }
 
-        print(
-            f"[GOVERNANCE] Registrando DQ: {result.table_name}.{result.test_name} = {'PASSED' if result.passed else 'FAILED'}"
-        )
+        status = "PASSED" if result.passed else "FAILED"
+        print(f"[GOVERNANCE] Registrando DQ: {result.table_name}.{result.test_name} = {status}")
         return self._make_request(
             "PUT",
             f"dataQuality/testCases/{result.table_name}/{result.test_name}/testCaseResult",

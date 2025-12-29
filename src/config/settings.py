@@ -14,6 +14,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+from config.secrets import get_secret
+
 # Carrega variaveis de ambiente do arquivo .env
 load_dotenv()
 
@@ -135,14 +137,12 @@ def get_spark_session(settings: Optional[Settings] = None):
 
     # Tenta usar spark existente (Databricks/HDInsight)
     try:
-        # Em Databricks, 'spark' ja existe como variavel global
-        from pyspark.sql import SparkSession
-
         existing = SparkSession.getActiveSession()
         if existing:
-            print(f"[INFO] Usando SparkSession existente")
+            print("[INFO] Usando SparkSession existente")
             return existing
-    except Exception:
+    except RuntimeError:
+        # SparkSession.getActiveSession() pode falhar se nao houver contexto Spark
         pass
 
     # Cria nova sessao (ambiente local)
@@ -168,7 +168,7 @@ def get_spark_session(settings: Optional[Settings] = None):
     # Configuracoes para Azure Storage (se em cloud)
     if settings.is_cloud:
         account = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
-        key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+        key = get_secret("AZURE_STORAGE_ACCOUNT_KEY")
         if account and key:
             builder = builder.config(f"fs.azure.account.key.{account}.dfs.core.windows.net", key)
 

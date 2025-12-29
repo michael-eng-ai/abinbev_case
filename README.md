@@ -210,7 +210,33 @@ cd abinbev_case
 poetry install --with dev
 ```
 
-### 2. Executando a Demonstração
+### 2. Configuração de Credenciais (Secrets Manager)
+
+O projeto utiliza um gerenciador de credenciais seguro que armazena senhas e tokens no keyring do sistema operacional (macOS Keychain, Windows Credential Manager, Linux Secret Service).
+
+**Credenciais suportadas:**
+- `AZURE_STORAGE_ACCOUNT_KEY` - Chave de acesso ao Azure Storage
+- `OPENMETADATA_TOKEN` - Token de autenticação do OpenMetadata
+- `HDINSIGHT_PASSWORD` - Senha do cluster HDInsight
+
+**Comandos do Secrets Manager:**
+```bash
+# Armazenar uma credencial (solicita o valor de forma segura)
+python scripts/manage_secrets.py set AZURE_STORAGE_ACCOUNT_KEY
+
+# Ver status das credenciais
+python scripts/manage_secrets.py status
+
+# Listar credenciais configuradas
+python scripts/manage_secrets.py list
+
+# Importar credenciais do .env para o keyring (migração)
+python scripts/manage_secrets.py import-from-env
+```
+
+**Fallback:** Em ambientes sem keyring (CI/CD, Docker), as credenciais são lidas automaticamente das variáveis de ambiente.
+
+### 3. Executando a Demonstração
 Para uma experiência completa, recomendamos seguir o **[Guia de Demonstração](demo/demo_guide.md)**, que orquestra o Airflow e o Jupyter Notebook.
 
 **Resumo Rápido (Apenas Pipeline):**
@@ -222,7 +248,7 @@ poetry run python notebooks/03_gold_business_rules.py
 poetry run python notebooks/04_consumption_dimensional.py
 ```
 
-### 3. Orquestração com Airflow (Local)
+### 4. Orquestração com Airflow (Local)
 Para replicar a orquestração oficial via Airflow:
 
 **1. Configuração Inicial (Primeira execução)**
@@ -257,7 +283,7 @@ poetry run airflow scheduler
 ```
 Acesse: [http://localhost:8080](http://localhost:8080) (Login: `admin` / `admin`)
 
-### 4. Explorando os Dados
+### 5. Explorando os Dados
 ```bash
 # Abra o notebook de consultas interativas
 poetry run jupyter notebook notebooks/interactive_queries.ipynb
@@ -401,10 +427,7 @@ Todos os registros possuem rastreabilidade completa:
 - [ ] Streaming com Kafka
 - [ ] ML para previsao de demanda
 - [ ] Data Mesh
-
----
-
-## Documentacao Adicional
+B
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Arquitetura detalhada
 - [DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) - Dicionario de dados

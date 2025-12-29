@@ -41,6 +41,8 @@ from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType
 
+from config.secrets import get_secret
+
 # %%
 # Configuracao - Detecta ambiente
 def get_environment():
@@ -112,7 +114,7 @@ def get_spark_session():
     
     if ENVIRONMENT != "local":
         account = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
-        key = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+        key = get_secret("AZURE_STORAGE_ACCOUNT_KEY")
         if account and key:
             builder = builder.config(
                 f"fs.azure.account.key.{account}.dfs.core.windows.net",
