@@ -161,7 +161,9 @@ def register_custom_properties() -> bool:
         from metadata.ingestion.ometa.ometa_api import OpenMetadata
 
         host = os.getenv("OPENMETADATA_HOST", "http://localhost:8585/api")
-        _metadata_client = OpenMetadata(config={"hostPort": host, "authProvider": "no-auth"})  # noqa: F841
+        _metadata_client = OpenMetadata(
+            config={"hostPort": host, "authProvider": "no-auth"}
+        )  # noqa: F841
 
         # TODO: Implementar criacao de propriedades customizadas usando _metadata_client
         # Propriedades customizadas a serem criadas
